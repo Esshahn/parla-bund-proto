@@ -129,7 +129,8 @@ alles Weitere ist reine Konfiguration.
    | `DATABASE_URL` | die Pooler-URI, Port **6543** |
    | `GOOGLE_API_KEY` | der Gemini-Schlüssel |
    | `ADMIN_PASSWORD` | das Zugangspasswort |
-   | `ANFRAGEN_PRO_STUNDE` | optional, Vorgabe 30 |
+   | `ANFRAGEN_PRO_MINUTE` | optional, Vorgabe 10 |
+   | `ANMELDEVERSUCHE_PRO_MINUTE` | optional, Vorgabe 5 |
 
    Alle für *Production*, *Preview* und *Development*.
 
@@ -154,15 +155,26 @@ zurückrechnen, und ein Passwortwechsel entwertet alle Cookies automatisch. Der
 Passwortvergleich läuft in konstanter Zeit, ein Fehlversuch wird um 700 ms
 verzögert.
 
-**Ratenbegrenzung**, voreingestellt 30 Anfragen je IP und Stunde. Gezählt wird
-in Postgres (`anfrage_limit`), nicht im Prozessspeicher: Auf Vercel bedient
-jede Instanz ihre eigenen Anfragen, ein Zähler im Speicher wäre wirkungslos.
-Gespeichert wird nur ein Hash der IP-Adresse — es entsteht kein Verzeichnis
-darüber, wer wann gefragt hat. Fällt die Zählung aus, wird durchgelassen und
-protokolliert; die Begrenzung darf die Anwendung nicht lahmlegen.
+**Ratenbegrenzung**, zwei getrennte Grenzen je IP und Minute:
 
-Die Prüfung steht **vor** dem Lesen des Anfragekörpers, damit eine abgelehnte
-Anfrage keinen Modellaufruf auslöst.
+| | Vorgabe | wogegen |
+|---|---|---|
+| `/api/ask` | 10 / Minute | Kosten durch Dauerbefragung |
+| `/login` | 5 / Minute | Durchprobieren des Passworts |
+
+Gezählt wird in Postgres (`anfrage_limit`), nicht im Prozessspeicher: Auf
+Vercel bedient jede Instanz ihre eigenen Anfragen, ein Zähler im Speicher wäre
+wirkungslos. Gespeichert wird nur ein Hash aus Zweck und IP-Adresse — es
+entsteht kein Verzeichnis darüber, wer wann gefragt hat. Fällt die Zählung
+aus, wird durchgelassen und protokolliert; die Begrenzung darf die Anwendung
+nicht lahmlegen.
+
+Die Prüfung steht jeweils **vor** der eigentlichen Arbeit: bei `/api/ask` vor
+dem Lesen der Frage (eine abgelehnte Anfrage löst keinen Modellaufruf aus),
+bei `/login` vor dem Passwortvergleich.
+
+Alte Zeitfenster räumt die Anwendung gelegentlich selbst weg (bei etwa jeder
+fünfzigsten Anfrage, nebenläufig). Ein eigener Job dafür wäre zu viel Apparat.
 
 Ein Budgetlimit in der Google Cloud Console ist trotzdem ratsam — es ist die
 einzige Schranke, die auch bei einem Fehler in der Anwendung greift.
@@ -174,6 +186,13 @@ herein; danach zieht `pg-resync` die geänderten Dokumente nach Supabase nach
 (vergleicht die Chunk-Anzahl je Dokument und ersetzt, was abweicht). Ein
 direkter Weg von der DIP-API nach Supabase existiert nicht.
 
-**Aufräumen der Zählertabelle.** `anfrage_limit` wächst mit jeder Stunde und
-IP. Für den Prototyp unkritisch, im Dauerbetrieb braucht es einen Job, der
-alte Fenster löscht.
+**Passwortlänge.** Das Gate ist nur so gut wie das Passwort. Bei kurzen
+Passwörtern trägt vor allem die Anmeldesperre — sie begrenzt das Raten auf 5
+Versuche pro Minute und IP. Wer den Link breiter streut, sollte ein längeres
+Passwort setzen; ein Angreifer mit mehreren IP-Adressen umgeht die Sperre.
+
+**Passwortwechsel wirkt nur nach Umgebungsvariable.** Die `.env` wird nicht
+deployt. Ein neues Passwort muss zusätzlich in den Vercel-Umgebungsvariablen
+gesetzt werden, und das Deployment muss danach neu gebaut werden. Bestehende
+Zugangs-Cookies verfallen dabei automatisch, weil der Cookie aus dem Passwort
+abgeleitet ist.

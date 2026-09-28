@@ -33,5 +33,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 		redirect(303, `/login?weiter=${encodeURIComponent(event.url.pathname + event.url.search)}`);
 	}
 
-	return resolve(event);
+	const antwort = await resolve(event);
+
+	// SvelteKit setzt auf gerenderten Seiten `public, max-age=0,
+	// must-revalidate`. Das wird zwar bei jedem Abruf neu geprueft, aber
+	// "public" ist fuer eine Seite hinter einem Passwort das falsche Signal:
+	// ein zwischengeschalteter Cache duerfte sie ablegen. Hinter dem Gate
+	// gilt deshalb `private, no-store`.
+	if (!offen) {
+		antwort.headers.set('cache-control', 'private, no-store');
+	}
+	return antwort;
 };

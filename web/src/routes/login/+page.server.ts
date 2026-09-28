@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { pruefeAnmeldung } from '$lib/server/ratelimit';
 import {
 	COOKIE_NAME,
 	cookieGueltig,
@@ -17,7 +18,17 @@ export const load: PageServerLoad = ({ cookies, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, url }) => {
+	default: async ({ request, cookies, url, getClientAddress }) => {
+		// Vor dem Vergleich: sonst waere ein kurzes Passwort mit reiner
+		// Rechenzeit zu finden.
+		const limit = await pruefeAnmeldung(getClientAddress());
+		if (!limit.erlaubt) {
+			const sekunden = Math.max(1, Math.ceil((limit.zuruecksetzen.getTime() - Date.now()) / 1000));
+			return fail(429, {
+				fehler: `Zu viele Versuche. Bitte in ${sekunden} Sekunden erneut probieren.`
+			});
+		}
+
 		const daten = await request.formData();
 		const passwort = String(daten.get('passwort') ?? '');
 
