@@ -10,6 +10,14 @@ loadEnv({ path: resolve(ROOT, '.env') });
 export const DATABASE_URL = process.env.DATABASE_URL ?? '';
 
 export const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY ?? '';
+
+// Zugangspasswort. Fehlt es, ist die Anwendung offen - das ist lokal
+// bequem und oeffentlich fahrlaessig, deshalb warnt hooks.server.ts davor.
+export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? '';
+
+// Anfragen je IP und Stunde. Jede kostet einen Embedding- und zwei
+// Modellaufrufe, deshalb eine Grenze auch hinter dem Passwort.
+export const ANFRAGEN_PRO_STUNDE = Number(process.env.ANFRAGEN_PRO_STUNDE ?? 30);
 export const GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Muss zu ingest/parla_ingest/config.py passen - andernfalls liegen

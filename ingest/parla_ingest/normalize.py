@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import re
 
+# Steuerzeichen ohne Funktion im Fliesstext. Tab und Zeilenumbruch bleiben.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 # Zeilenende-Trennung: Buchstabe + "-" + Umbruch + Buchstabe.
 _HYPHEN_BREAK = re.compile(r"(\w)-\n[ \t]*(\w)")
 # Aufzaehlungsellipse ("Bundes- und Laenderebene") darf nicht verschmelzen.
@@ -49,6 +52,11 @@ def prepare(text: str) -> str:
     if not text:
         return ""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    # NUL-Bytes stammen aus misslungenen Ligaturen der PDF-Extraktion beim
+    # Bundestag ("Oe\x00entlichkeitsarbeit" war "Oeffentlichkeitsarbeit").
+    # Welche Ligatur es war, laesst sich nicht rekonstruieren - also weg damit.
+    # Postgres lehnt NUL in Textspalten ausserdem rundheraus ab.
+    text = _CONTROL_CHARS.sub("", text)
     # Weiche Trennstriche raus, geschuetzte Leerzeichen zu normalen - sonst
     # zerfaellt "BUENDNIS\xa090/DIE GRUENEN" in zwei verschiedene Fraktionen.
     text = text.replace("\xad", "").replace("\xa0", " ").replace("\u2009", " ")

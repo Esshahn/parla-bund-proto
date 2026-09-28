@@ -23,13 +23,30 @@ Supabase Free hat 500 MB — es braucht ein **Pro-Projekt** (8 GB).
 
 ## Schritt 2 — Zugangsdaten eintragen · *du*
 
-Unter **Project Settings → Database → Connection string** stehen zwei URIs.
-Wir brauchen beide, sie haben verschiedene Aufgaben:
+Die Connection Strings stehen hinter dem grünen **„Connect"**-Knopf in der
+oberen Leiste des Dashboards (nicht unter Settings — dort gibt es keinen
+Punkt „Database" mehr).
 
-| Port | Name | wofür |
+**Die „Direct connection" ist IPv6-only.** Wer kein IPv6 hat, kommt dort nicht
+hin; der Port ist schlicht nicht erreichbar. Prüfen mit:
+
+```bash
+curl -6 -s -m 8 -o /dev/null https://ipv6.google.com && echo "IPv6 ok" || echo "kein IPv6"
+```
+
+Ohne IPv6 nimmt man statt der direkten Verbindung den **Session pooler** —
+genau dafür ist er da. Wir brauchen dann diese beiden:
+
+| im Dialog | Port | wofür |
 |---|---|---|
-| 5432 | Direct connection | die einmalige Migration (lange Transaktionen, `COPY`) |
-| 6543 | Transaction pooler | der Betrieb (viele kurzlebige Serverless-Verbindungen) |
+| **Session pooler** | 5432 | die einmalige Migration (`COPY`, lange Transaktionen) |
+| **Transaction pooler** | 6543 | der Betrieb (viele kurzlebige Serverless-Verbindungen) |
+
+Beide laufen auf demselben Host und unterscheiden sich nur im Port. Woran man
+erkennt, dass man die richtigen erwischt hat: Der Host endet auf
+`pooler.supabase.com`, und der Benutzername trägt die Projekt-ID hinter einem
+Punkt (`postgres.abcdef…`). Steht dort `postgres@db.…supabase.co`, ist es die
+direkte Verbindung.
 
 In die `.env` im Projektwurzelverzeichnis:
 
@@ -51,8 +68,40 @@ DATABASE_URL="$DATABASE_URL_DIRECT" .venv/bin/python -m parla_ingest migrate-pg
 Das Skript legt das Schema an, überträgt 8.306 Dokumente und 416.837 Chunks
 samt Vektoren und baut danach die Indexe.
 
-Zur Dauer: Es gehen rund 2 GB über die Leitung. Rechne je nach Anbindung mit
-30 bis 90 Minuten, plus etwa 10 bis 20 Minuten für den HNSW-Index am Ende.
+Zur Dauer: gemessen rund **7 Minuten** für 416.837 Chunks (~1.000/s).
+
+Der HNSW-Index ist ein eigener Schritt und hängt an der Compute-Größe. Sein Aufbau braucht grob
+`Anzahl × Dimensionen × Bytes × 2`, bei uns rund **1,28 GB**. Passt das nicht
+in `maintenance_work_mem`, weicht Postgres auf einen plattenbasierten Aufbau
+aus, der 10- bis 50-mal langsamer ist:
+
+| Compute | RAM | `maintenance_work_mem` | Index-Aufbau |
+|---|---|---|---|
+| Micro | 1 GB | 134 MB | plattenbasiert, Stunden |
+| Medium | 4 GB | 268 MB (auf 1,6 GB setzbar) | zügig |
+
+Compute lässt sich jederzeit ändern und wird stundenweise abgerechnet. Der
+sparsame Weg: Daten auf Micro übertragen, für den Index kurz auf Medium hoch,
+danach auf Small (2 GB) zurück — der fertige Index ist ~770 MB und passt dort
+in den Cache.
+
+```bash
+# nach dem Hochstellen auf Medium
+DATABASE_URL="$DATABASE_URL_DIRECT" .venv/bin/python -m parla_ingest pg-index --mem 1600MB
+```
+
+Der Index ist nicht optional: **ohne ihn dauert eine semantische Anfrage
+12,8 Sekunden** (gemessen), mit ihm liegt sie im zweistelligen
+Millisekundenbereich.
+
+Zwei Eigenheiten von Supabase, über die der Aufbau sonst stolpert — beide sind
+im Skript bereits berücksichtigt:
+
+- `statement_timeout` steht auf **2 Minuten**. Der GIN-Index bleibt mit 67 s
+  darunter, der HNSW-Aufbau nicht. `pg-index` setzt ihn für seine Sitzung aus.
+- NUL-Bytes im Text (aus misslungenen PDF-Ligaturen des Bundestages) lehnt
+  Postgres ab, SQLite nicht. Betroffen waren 26 von 416.837 Chunks; die
+  Migration entfernt sie, die Normalisierung ebenfalls.
 
 Der Lauf ist **wiederaufnehmbar** — nach einem Abbruch einfach erneut starten,
 er setzt hinter der zuletzt geschriebenen Chunk-ID fort.
@@ -79,8 +128,14 @@ alles Weitere ist reine Konfiguration.
    |---|---|
    | `DATABASE_URL` | die Pooler-URI, Port **6543** |
    | `GOOGLE_API_KEY` | der Gemini-Schlüssel |
+   | `ADMIN_PASSWORD` | das Zugangspasswort |
+   | `ANFRAGEN_PRO_STUNDE` | optional, Vorgabe 30 |
 
-   Beide für *Production*, *Preview* und *Development*.
+   Alle für *Production*, *Preview* und *Development*.
+
+   **Ohne `ADMIN_PASSWORD` ist die Anwendung offen.** Sie startet trotzdem und
+   schreibt eine Warnung ins Log — das ist lokal bequem und öffentlich
+   fahrlässig.
 4. Deploy.
 
 Region und Laufzeit sind in `web/vite.config.ts` gesetzt (`fra1`, 120 s) und
@@ -88,13 +143,37 @@ brauchen keine Einstellung im Dashboard.
 
 ---
 
+## Zugangsschutz
+
+Zwei Schichten, beide eingebaut:
+
+**Passwort-Gate.** `hooks.server.ts` verlangt vor jeder Seite und jeder
+API-Anfrage einen gültigen Cookie. Der Cookie ist ein HMAC über eine feste
+Kennung mit dem Passwort als Schlüssel — daraus lässt sich das Passwort nicht
+zurückrechnen, und ein Passwortwechsel entwertet alle Cookies automatisch. Der
+Passwortvergleich läuft in konstanter Zeit, ein Fehlversuch wird um 700 ms
+verzögert.
+
+**Ratenbegrenzung**, voreingestellt 30 Anfragen je IP und Stunde. Gezählt wird
+in Postgres (`anfrage_limit`), nicht im Prozessspeicher: Auf Vercel bedient
+jede Instanz ihre eigenen Anfragen, ein Zähler im Speicher wäre wirkungslos.
+Gespeichert wird nur ein Hash der IP-Adresse — es entsteht kein Verzeichnis
+darüber, wer wann gefragt hat. Fällt die Zählung aus, wird durchgelassen und
+protokolliert; die Begrenzung darf die Anwendung nicht lahmlegen.
+
+Die Prüfung steht **vor** dem Lesen des Anfragekörpers, damit eine abgelehnte
+Anfrage keinen Modellaufruf auslöst.
+
+Ein Budgetlimit in der Google Cloud Console ist trotzdem ratsam — es ist die
+einzige Schranke, die auch bei einem Fehler in der Anwendung greift.
+
 ## Was noch offen ist
 
-**Zugangsschutz.** Eine öffentliche URL bedeutet, dass jede Anfrage über
-unseren Gemini-Schlüssel läuft. Vor dem Streuen des Links sollte mindestens
-eines davon stehen: Passwortschutz, eine Ratenbegrenzung pro IP, oder ein
-Budgetlimit in der Google Cloud Console.
-
 **Aktualisierung.** Neue Dokumente kommen weiterhin über den lokalen Ingest
-herein; danach muss `migrate-pg` erneut laufen. Ein direkter Weg von der
-DIP-API nach Supabase existiert noch nicht.
+herein; danach zieht `pg-resync` die geänderten Dokumente nach Supabase nach
+(vergleicht die Chunk-Anzahl je Dokument und ersetzt, was abweicht). Ein
+direkter Weg von der DIP-API nach Supabase existiert nicht.
+
+**Aufräumen der Zählertabelle.** `anfrage_limit` wächst mit jeder Stunde und
+IP. Für den Prototyp unkritisch, im Dauerbetrieb braucht es einen Job, der
+alte Fenster löscht.

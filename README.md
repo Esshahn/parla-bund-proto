@@ -23,16 +23,21 @@ den Parla Berlin über LLamaParse fahren muss, entfällt hier vollständig.
 ## Aufbau
 
 ```
-DIP-API  ──►  ingest/ (Python)  ──►  data/parla.db  ──►  web/ (SvelteKit)  ──►  Browser
-              harvest                documents            /api/ask
-              normalize              chunks               RAG-Pipeline
-              segment                FTS5  (BM25)         SSE-Stream
-              embed                  vec0  (Vektoren)
-                                                    Gemini (Embedding + Antwort)
+DIP-API ──► ingest/ (Python) ──► data/parla.db ──► Supabase ──► web/ ──► Browser
+            harvest              documents         Postgres     /api/ask
+            normalize            chunks            tsvector     RAG-Pipeline
+            segment              FTS5   (BM25)     pgvector     SSE-Stream
+            embed                vec0   (Vektoren) + HNSW
+                                       migrate-pg ↗        Gemini (Embedding + Antwort)
 ```
 
-Die Suche ist **hybrid**: BM25 und Vektorsuche laufen parallel und werden per
-Reciprocal Rank Fusion zusammengeführt. BM25 findet Eigennamen und
+SQLite ist die **Arbeitsdatenbank des Ingest**: dort wird geerntet, gechunkt
+und eingebettet. Supabase ist die **Betriebsdatenbank**: dorthin zieht der
+fertige Index um, weil eine Vercel-Function keine 2-GB-Datei mitschleppen kann.
+Der Weg dazwischen ist `migrate-pg`; siehe [DEPLOY.md](DEPLOY.md).
+
+Die Suche ist **hybrid**: Wortsuche und Vektorsuche laufen parallel und werden
+per Reciprocal Rank Fusion zusammengeführt. BM25 findet Eigennamen und
 Drucksachennummern exakt, versteht aber „Geld fürs E-Auto" nicht als
 „Umweltbonus". Vektoren können genau das, verfehlen dafür Aktenzeichen.
 Bürgerfragen enthalten typischerweise beides.
@@ -93,6 +98,10 @@ Ohne Weboberfläche, direkt gegen den Index:
 
 ## Anwendung starten
 
+Die Weboberfläche liest aus **Supabase**, nicht aus der lokalen SQLite-Datei.
+Ohne `DATABASE_URL` in der `.env` startet sie, liefert aber bei der ersten
+Frage einen Fehler. Einrichtung: [DEPLOY.md](DEPLOY.md).
+
 Aus dem Projektwurzelverzeichnis:
 
 ```bash
@@ -115,14 +124,16 @@ die Quere kommen.
 | `ingest/parla_ingest/segment.py` | Chunking; Redebeiträge mit Sprecher |
 | `ingest/parla_ingest/store.py` | SQLite-Schema: Dokumente, Chunks, FTS5, Vektoren |
 | `ingest/parla_ingest/embed.py` | Embeddings, parallel und wiederaufnehmbar |
-| `ingest/parla_ingest/retrieve.py` | hybride Suche (Referenz, für die Prüfung) |
+| `ingest/parla_ingest/retrieve.py` | hybride Suche über SQLite (Referenz, für die Prüfung) |
 | `ingest/parla_ingest/rag.py` | RAG-Pipeline für die Kommandozeile |
-| `web/src/lib/server/retrieve.ts` | dieselbe Suche, für den Anfragebetrieb |
+| `ingest/parla_ingest/postgres.py` | Umzug nach Supabase, Schema und Indexe |
+| `web/src/lib/server/retrieve.ts` | dieselbe Suche über Postgres, für den Betrieb |
 | `web/src/lib/server/rag.ts` | RAG-Pipeline hinter `/api/ask` |
 | `prompts/` | Prompts, von beiden Seiten gelesen |
 
-`retrieve.py` und `retrieve.ts` sind zwei Umsetzungen derselben Logik. Siehe
-`status.md`, Abschnitt „Was offen ist".
+`retrieve.py` und `retrieve.ts` sind zwei Umsetzungen derselben Logik — seit
+dem Umzug sogar über zwei verschiedene Datenbanken. Siehe `status.md`,
+Abschnitt „Was offen ist".
 
 ## Gestaltung
 

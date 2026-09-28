@@ -1,11 +1,33 @@
 import type { RequestHandler } from './$types';
 import { ask } from '$lib/server/rag';
+import { pruefeLimit } from '$lib/server/ratelimit';
+import { ANFRAGEN_PRO_STUNDE } from '$lib/server/config';
 
 /**
  * Antwortet als Server-Sent-Events. Die Antwort entsteht in mehreren
  * Sekunden; gestreamt steht die erste Zeile nach etwa einer.
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+	// Vor allem anderen: eine abgelehnte Anfrage soll nichts kosten.
+	const limit = await pruefeLimit(getClientAddress());
+	if (!limit.erlaubt) {
+		const minuten = Math.ceil((limit.zuruecksetzen.getTime() - Date.now()) / 60_000);
+		return new Response(
+			JSON.stringify({
+				fehler:
+					`Zu viele Anfragen. Der Prototyp lässt ${ANFRAGEN_PRO_STUNDE} Fragen pro ` +
+					`Stunde zu – bitte in ${minuten} Minuten erneut versuchen.`
+			}),
+			{
+				status: 429,
+				headers: {
+					'Content-Type': 'application/json',
+					'Retry-After': String(minuten * 60)
+				}
+			}
+		);
+	}
+
 	const { frage } = (await request.json()) as { frage?: string };
 
 	if (!frage?.trim()) {

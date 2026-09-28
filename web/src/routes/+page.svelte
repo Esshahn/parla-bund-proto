@@ -63,8 +63,19 @@
 				signal: abbruch.signal
 			});
 
+			// Der Zugang ist abgelaufen – zurück zur Anmeldung, statt eine
+			// technische Fehlermeldung zu zeigen.
+			if (antwortStrom.status === 401) {
+				window.location.href = `/login?weiter=${encodeURIComponent(window.location.pathname)}`;
+				return;
+			}
+
 			if (!antwortStrom.ok || !antwortStrom.body) {
-				throw new Error(`Der Server antwortet mit ${antwortStrom.status}.`);
+				const meldung = await antwortStrom
+					.json()
+					.then((d) => d?.fehler)
+					.catch(() => null);
+				throw new Error(meldung ?? `Der Server antwortet mit ${antwortStrom.status}.`);
 			}
 
 			const leser = antwortStrom.body.getReader();

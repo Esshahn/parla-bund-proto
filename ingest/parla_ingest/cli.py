@@ -6,7 +6,9 @@
     python -m parla_ingest search  "Frage"  [--limit N] [--art Drucksache]
     python -m parla_ingest ask     "Frage"  [--limit N]
     python -m parla_ingest stats
-    python -m parla_ingest migrate-pg          # Index nach Supabase umziehen
+    python -m parla_ingest migrate-pg          # Daten nach Supabase umziehen
+    python -m parla_ingest pg-index            # Indexe in Postgres anlegen
+    python -m parla_ingest pg-resync           # geaenderte Dokumente nachziehen
 """
 
 from __future__ import annotations
@@ -115,6 +117,18 @@ def cmd_migrate_pg(args: argparse.Namespace) -> None:
     migrate(batch=args.batch, skip_indexes=args.skip_indexes)
 
 
+def cmd_pg_index(args: argparse.Namespace) -> None:
+    from .postgres import build_indexes
+
+    build_indexes(maintenance_work_mem=args.mem)
+
+
+def cmd_pg_resync(_args: argparse.Namespace) -> None:
+    from .postgres import resync
+
+    resync()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="parla_ingest", description="Ingest und Suche fuer Parla Bund"
@@ -162,6 +176,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Indexe nicht anlegen (fuer einen zweiten Durchlauf)",
     )
     p.set_defaults(func=cmd_migrate_pg)
+
+    p = sub.add_parser("pg-index", help="Indexe in Postgres anlegen (nach migrate-pg)")
+    p.add_argument(
+        "--mem",
+        help="maintenance_work_mem fuer diese Sitzung, etwa '2GB'. "
+        "Nur so hoch setzen, wie die Instanz wirklich RAM hat.",
+    )
+    p.set_defaults(func=cmd_pg_index)
+
+    sub.add_parser(
+        "pg-resync", help="geaenderte Dokumente nach Postgres nachziehen"
+    ).set_defaults(func=cmd_pg_resync)
 
     sub.add_parser("stats", help="Stand des Index").set_defaults(func=cmd_stats)
 

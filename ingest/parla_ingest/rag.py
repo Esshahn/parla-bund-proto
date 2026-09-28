@@ -33,6 +33,8 @@ from .retrieve import Hit, search, with_neighbours
 TOP_K = 12
 NEIGHBOUR_WINDOW = 1
 MAX_CONTEXT_CHARS = 60_000
+# Obergrenze je Belegstelle - siehe web/src/lib/server/rag.ts.
+MAX_BLOCK_CHARS = 8_000
 
 def _load_prompt(name: str) -> str:
     """Prompts liegen in web/prompts/ - dieselben Dateien nutzt das Backend.
@@ -156,8 +158,10 @@ def build_context(hits: list[Hit]) -> tuple[str, list[Hit]]:
 
     for hit in hits:
         block = f"[{len(used) + 1}] {hit.quelle}\n{hit.titel}\n{hit.text}"
-        if length + len(block) > MAX_CONTEXT_CHARS:
-            break
+        # Ueberspringen statt abbrechen: sonst beendet eine einzige zu grosse
+        # Stelle die Schleife und alle folgenden Belege fallen weg.
+        if len(block) > MAX_BLOCK_CHARS or length + len(block) > MAX_CONTEXT_CHARS:
+            continue
         blocks.append(block)
         used.append(hit)
         length += len(block)

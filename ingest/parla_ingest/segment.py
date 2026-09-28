@@ -70,6 +70,30 @@ def _speaker_from_match(match: re.Match[str]) -> Speaker:
     return Speaker(group["suffix_name"], group["suffix_role"], None)
 
 
+def _hard_split(sentences: list[str]) -> list[str]:
+    """Notbremse fuer Text ohne Satzzeichen.
+
+    Impressumsbloecke und Tabellen enthalten mitunter ueber 100.000 Zeichen
+    am Stueck. Ohne Satzende findet die Satztrennung keine Schnittstelle, und
+    es entstuende ein einzelner riesiger Chunk: semantisch nutzlos (das
+    Embedding-Modell sieht nur die ersten 8.000 Zeichen) und im Kontext-
+    fenster verdraengt er alle anderen Belege.
+    """
+    grenze = config.CHUNK_TARGET_CHARS * 2
+    ergebnis: list[str] = []
+    for satz in sentences:
+        while len(satz) > grenze:
+            # Moeglichst an einem Leerzeichen trennen, sonst hart.
+            schnitt = satz.rfind(" ", 0, grenze)
+            if schnitt < grenze // 2:
+                schnitt = grenze
+            ergebnis.append(satz[:schnitt])
+            satz = satz[schnitt:].lstrip()
+        if satz:
+            ergebnis.append(satz)
+    return ergebnis
+
+
 def _pack(pieces: list[str]) -> list[str]:
     """Stueckt Textteile zu Chunks nahe der Zielgroesse, ohne Saetze zu zerschneiden."""
     chunks: list[str] = []
@@ -85,7 +109,7 @@ def _pack(pieces: list[str]) -> list[str]:
             if current:
                 chunks.append(current)
                 current = ""
-            sentences = _SENTENCE_END.split(piece)
+            sentences = _hard_split(_SENTENCE_END.split(piece))
             buffer = ""
             for sentence in sentences:
                 if buffer and len(buffer) + len(sentence) + 1 > config.CHUNK_TARGET_CHARS:

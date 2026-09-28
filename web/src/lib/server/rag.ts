@@ -16,6 +16,11 @@ import { quelle, search, withNeighbours, type Hit } from './retrieve';
 const TOP_K = 12;
 const NEIGHBOUR_WINDOW = 1;
 const MAX_CONTEXT_CHARS = 60_000;
+// Obergrenze je Belegstelle. Der Segmentierer erzeugt vereinzelt riesige
+// Chunks (Impressumsbloecke und Tabellen ohne Satzzeichen, bis 280.000
+// Zeichen). Eingebettet wurden davon ohnehin nur die ersten 8.000, und im
+// Kontextfenster wuerde so ein Brocken alle anderen Belege verdraengen.
+const MAX_BLOCK_CHARS = 8_000;
 
 /**
  * Platzhalter ersetzen, ohne dass der eingesetzte Text interpretiert wird.
@@ -93,7 +98,10 @@ export function buildContext(hits: Hit[]): { kontext: string; quellen: Quelle[] 
 	for (const hit of hits) {
 		const nummer = quellen.length + 1;
 		const block = `[${nummer}] ${quelle(hit)}\n${hit.titel}\n${hit.text}`;
-		if (length + block.length > MAX_CONTEXT_CHARS) break;
+		// Ueberspringen statt abbrechen: sonst beendet eine einzige zu grosse
+		// Stelle die Schleife und alle folgenden Belege fallen weg.
+		if (block.length > MAX_BLOCK_CHARS) continue;
+		if (length + block.length > MAX_CONTEXT_CHARS) continue;
 		blocks.push(block);
 		length += block.length;
 		quellen.push({

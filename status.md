@@ -10,6 +10,12 @@ Schritten 1 bis 7 umgesetzt.
 
 Der Index ist vollständig: alle 416.837 Chunks sind eingebettet.
 
+Seither ist die Speicherschicht **von SQLite nach Supabase/Postgres** umgezogen,
+damit der Prototyp auf Vercel deploybar wird — eine Serverless-Function kann
+keine 2-GB-Datei mitschleppen. SQLite bleibt die Arbeitsdatenbank des Ingest,
+Postgres wird die Betriebsdatenbank. Der Weg dazwischen ist `migrate-pg`,
+beschrieben in `DEPLOY.md`.
+
 ## Der Korpus
 
 | | |
@@ -74,6 +80,36 @@ benutzbar ist — ausgeschlossen werden sie nicht.
   Dollarzeichen hätte den Prompt still verstümmelt.
 - Die Quellenliste zeigte achtmal dasselbe Dokument. Jetzt nach Dokumenten
   gruppiert, mit den belegten Stellen darunter.
+- Der Dunkelmodus war aus der ersten Fassung stehen geblieben, obwohl das DIP
+  keinen hat. Entfernt, `color-scheme: light` gesetzt.
+
+Beim Umzug nach Supabase kamen drei dazu, alle durch Messen statt Vermuten
+gefunden:
+
+- **NUL-Bytes im Text.** 26 von 416.837 Chunks, aus misslungenen PDF-Ligaturen
+  des Bundestages (`Ö\x00entlichkeitsarbeit` war „Öffentlichkeitsarbeit").
+  SQLite toleriert sie, Postgres lehnt sie ab. Ein Probelauf über 75 Sekunden
+  hat das gefunden, bevor 2 GB umsonst übertragen waren.
+- **`statement_timeout` von 2 Minuten** bei Supabase. Der GIN-Index bleibt mit
+  67 s darunter, der HNSW-Aufbau nicht — er rechnete und brach dann ab.
+- **Die „Direct connection" ist IPv6-only.** Ohne IPv6 im Netz ist sie schlicht
+  nicht erreichbar; für die Migration tut es der Session pooler.
+
+## Was der Umzug nach Postgres geändert hat
+
+| | SQLite | Supabase |
+|---|---|---|
+| Vektoren | sqlite-vec, float32, 1,28 GB | pgvector `halfvec`, 640 MB, HNSW |
+| Wortsuche | FTS5/BM25, keine Stammformen | `tsvector('german')`, `ts_rank_cd` |
+| Nachbar-Chunks | eine Anfrage je Treffer | eine Anfrage für alle |
+
+**Die deutsche Textsuche stemmt** — das ist der inhaltliche Gewinn, nicht nur
+ein Betriebsdetail. `to_tsvector('german', 'Die Mietpreisen der Renten steigen')`
+ergibt `'mietpreis' 'rent' 'steig'`. FTS5 hat nur Umlaute normalisiert; „Renten"
+fand „Rente" nicht. Die handgepflegte Stoppwortliste entfällt ebenfalls.
+
+**halfvec halbiert die Vektoren** bei praktisch unverändertem Rückruf. Das war
+nötig: mit float32 wäre die Datenbank bei ~3,8 GB statt ~2,4 GB gelandet.
 
 ## Eine Grenze des Ansatzes
 
@@ -118,9 +154,14 @@ Dokumenten und eine wiederholbare Auswertung.
 kann einen Chunk von über 4.000 Zeichen erzeugen. Unschön, aber bisher ohne
 erkennbaren Schaden.
 
-**Nur Wahlperiode 21.** Für WP 20 und früher verdreifacht sich der Korpus. Ab
-dieser Größenordnung ist Postgres mit `pgvector` und HNSW die richtige
-Speicherschicht; der Wechsel betrifft nur `store.py` und `db.ts`.
+**Nur Wahlperiode 21.** Für WP 20 und früher verdreifacht sich der Korpus. Die
+Speicherschicht trägt das inzwischen (Postgres mit HNSW), die Frage ist eher
+die Trefferqualität bei wachsendem Bestand — siehe oben.
+
+**Aktualisierung ist zweistufig.** Neue Dokumente kommen über den lokalen
+Ingest herein, danach muss `migrate-pg` erneut laufen. Ein direkter Weg von der
+DIP-API nach Supabase existiert nicht. Für einen Dauerbetrieb wäre das der
+nächste Umbau.
 
 **Vorgangsverläufe fehlen.** `/vorgang` und `/vorgangsposition` verbinden
 Dokumente zu einem Verfahren. Damit ließe sich „Was ist aus dem Gesetz

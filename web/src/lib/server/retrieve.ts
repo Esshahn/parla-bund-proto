@@ -13,10 +13,16 @@ import { db } from './db';
  * mit 1/(k+Rang) ab. RRF braucht keine vergleichbaren Scores - ts_rank_cd und
  * Kosinusdistanz sind nicht ineinander umrechenbar.
  *
- * Gegenueber der SQLite-Fassung (ingest/parla_ingest/retrieve.py) aendert sich
- * die lexikalische Seite zum Besseren: 'german' stemmt ("Renten" findet
- * "Rente") und bringt eigene Stoppwoerter mit. Die Stoppwortliste von Hand zu
- * pflegen entfaellt damit.
+ * Gegenueber der SQLite-Fassung (ingest/parla_ingest/retrieve.py) gibt es zwei
+ * Unterschiede auf der lexikalischen Seite:
+ *
+ *   besser:    'german' stemmt ("Renten" findet "Rente") und bringt eigene
+ *              Stoppwoerter mit. Die handgepflegte Liste entfaellt.
+ *   schlechter: ts_rank_cd kennt keine IDF. BM25 gewichtete seltene Begriffe
+ *              hoeher; hier schlaegt ein Chunk mit 50x "Kinder" einen mit 1x
+ *              "Fruehstartrente". Ersatz ist parla_tsquery(): die Funktion
+ *              wirft Begriffe aus der Anfrage, die in zu vielen Chunks
+ *              vorkommen (siehe ingest/parla_ingest/postgres.py).
  */
 
 const RRF_K = 60;
@@ -45,13 +51,12 @@ export type Hit = {
 export type Filters = { dokumentart?: string | null };
 
 /**
- * Nutzerfrage in eine tsquery uebersetzen. ODER statt UND: als UND bliebe bei
- * einer ganzen Frage fast immer nichts uebrig. ts_rank_cd gewichtet seltene
- * Begriffe ohnehin hoeher.
+ * Suchbegriffe aus der Frage loesen. Verknuepft werden sie in Postgres von
+ * parla_tsquery() mit ODER - als UND bliebe bei einer ganzen Frage fast immer
+ * nichts uebrig.
  */
-export function buildTsQuery(text: string): string {
-	const tokens = (text.match(TOKEN) ?? []).slice(0, 32);
-	return tokens.join(' | ');
+export function queryTerms(text: string): string[] {
+	return (text.match(TOKEN) ?? []).slice(0, 32);
 }
 
 type Row = Omit<Hit, 'score' | 'found_by'>;
@@ -65,8 +70,8 @@ export async function searchLexical(
 	filters: Filters = {},
 	limit = CANDIDATES_PER_METHOD
 ): Promise<Hit[]> {
-	const tsquery = buildTsQuery(query);
-	if (!tsquery) return [];
+	const terms = queryTerms(query);
+	if (terms.length === 0) return [];
 	const sql = db();
 	const art = filters.dokumentart ?? null;
 
@@ -76,7 +81,7 @@ export async function searchLexical(
 		       d.titel, to_char(d.datum, 'YYYY-MM-DD') AS datum, d.pdf_url
 		  FROM chunks c
 		  JOIN documents d ON d.id = c.document_id,
-		       to_tsquery('german', ${tsquery}) q
+		       parla_tsquery(${terms}::text[]) q
 		 WHERE c.fts @@ q
 		   AND (${art}::text IS NULL OR d.dokumentart = ${art})
 		 ORDER BY ts_rank_cd(c.fts, q) DESC
