@@ -1,0 +1,23 @@
+# Umgebung
+.env
+.env.*
+!.env.example
+
+# Python
+ingest/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+node_modules/
+web/.svelte-kit/
+web/build/
+web/.vite/
+
+# Daten (Korpus wird aus der DIP-API neu geerntet)
+data/
+
+# System
+.DS_Store
+*.log

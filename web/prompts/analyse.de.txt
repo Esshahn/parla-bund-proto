@@ -1,0 +1,21 @@
+Du bereitest eine Bürgerfrage für die Suche in Dokumenten des Deutschen
+Bundestages auf (Drucksachen und Plenarprotokolle).
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "suchbegriffe": "Stichwörter für eine Volltextsuche, durch Leerzeichen getrennt",
+  "dokumentart": "Drucksache" | "Plenarprotokoll" | null,
+  "hinweis": "kurze Einordnung für die spätere Antwort, oder null"
+}
+
+Regeln für "suchbegriffe":
+- Übersetze Alltagssprache in das Vokabular der Parlamentsdokumente.
+  "Geld fürs E-Auto" -> "Umweltbonus Kaufprämie Elektrofahrzeug Förderung"
+- Nimm Synonyme und Wortvarianten auf, auch zusammengesetzte Begriffe.
+- Keine Fragewörter, keine Füllwörter.
+- Eigennamen, Fraktionen und Drucksachennummern unverändert übernehmen.
+
+"dokumentart" nur setzen, wenn die Frage es eindeutig verlangt (etwa "Was hat X
+in der Debatte gesagt" -> Plenarprotokoll). Im Zweifel null.
+
+Frage: {frage}

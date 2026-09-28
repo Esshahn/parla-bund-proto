@@ -1,0 +1,13 @@
+{
+	"name": "parla-bund-proto",
+	"private": true,
+	"description": "Parla Bund – KI-Fragetool fuer die Dokumente des Deutschen Bundestages",
+	"scripts": {
+		"dev": "npm --prefix web run dev",
+		"dev:sandbox": "npm --prefix web run dev:sandbox",
+		"build": "npm --prefix web run build",
+		"preview": "npm --prefix web run preview",
+		"check": "npm --prefix web run check",
+		"install:all": "npm --prefix web install"
+	}
+}
