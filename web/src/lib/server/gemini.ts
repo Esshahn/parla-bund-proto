@@ -1,5 +1,12 @@
 import { CHAT_MODEL, EMBED_DIMS, EMBED_MODEL, GOOGLE_API_KEY, GOOGLE_BASE_URL } from './config';
 
+/** -1 überlässt dem Modell die Entscheidung; 0 schaltet das Denken ab. */
+function generationConfig(temperature: number, denkbudget: number) {
+	return denkbudget < 0
+		? { temperature }
+		: { temperature, thinkingConfig: { thinkingBudget: denkbudget } };
+}
+
 function requireKey(): string {
 	if (!GOOGLE_API_KEY) {
 		throw new Error('GOOGLE_API_KEY fehlt in der .env im Projektwurzelverzeichnis.');
@@ -44,7 +51,11 @@ function textOf(payload: unknown): string {
 		.join('');
 }
 
-export async function generate(prompt: string, temperature = 0.2): Promise<string> {
+export async function generate(
+	prompt: string,
+	temperature = 0.2,
+	denkbudget = -1
+): Promise<string> {
 	const response = await fetch(
 		`${GOOGLE_BASE_URL}/models/${CHAT_MODEL}:generateContent?key=${requireKey()}`,
 		{
@@ -52,7 +63,7 @@ export async function generate(prompt: string, temperature = 0.2): Promise<strin
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				contents: [{ role: 'user', parts: [{ text: prompt }] }],
-				generationConfig: { temperature }
+				generationConfig: generationConfig(temperature, denkbudget)
 			})
 		}
 	);
@@ -66,7 +77,8 @@ export async function generate(prompt: string, temperature = 0.2): Promise<strin
  *  rund einer Sekunde statt nach zehn. */
 export async function* generateStream(
 	prompt: string,
-	temperature = 0.2
+	temperature = 0.2,
+	denkbudget = -1
 ): AsyncGenerator<string> {
 	const response = await fetch(
 		`${GOOGLE_BASE_URL}/models/${CHAT_MODEL}:streamGenerateContent?alt=sse&key=${requireKey()}`,
@@ -75,7 +87,7 @@ export async function* generateStream(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				contents: [{ role: 'user', parts: [{ text: prompt }] }],
-				generationConfig: { temperature }
+				generationConfig: generationConfig(temperature, denkbudget)
 			})
 		}
 	);

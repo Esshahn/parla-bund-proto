@@ -72,24 +72,37 @@ class Generator:
             f":{method}?key={self.api_key}"
         )
 
-    def complete(self, prompt: str, *, temperature: float = 0.2) -> str:
+    @staticmethod
+    def _gen_config(temperature: float, denkbudget: int) -> dict:
+        if denkbudget < 0:
+            return {"temperature": temperature}
+        return {
+            "temperature": temperature,
+            "thinkingConfig": {"thinkingBudget": denkbudget},
+        }
+
+    def complete(
+        self, prompt: str, *, temperature: float = 0.2, denkbudget: int = -1
+    ) -> str:
         response = self._client.post(
             self._url("generateContent"),
             json={
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": temperature},
+                "generationConfig": self._gen_config(temperature, denkbudget),
             },
         )
         response.raise_for_status()
         return _text_of(response.json())
 
-    def stream(self, prompt: str, *, temperature: float = 0.2) -> Iterator[str]:
+    def stream(
+        self, prompt: str, *, temperature: float = 0.2, denkbudget: int = -1
+    ) -> Iterator[str]:
         with self._client.stream(
             "POST",
             self._url("streamGenerateContent") + "&alt=sse",
             json={
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": temperature},
+                "generationConfig": self._gen_config(temperature, denkbudget),
             },
         ) as response:
             response.raise_for_status()
@@ -126,10 +139,12 @@ _JSON_BLOCK = re.compile(r"\{.*\}", re.S)
 
 def analyse_query(generator: Generator, frage: str) -> dict:
     """Schritt 1. Faellt auf die Rohfrage zurueck, wenn das Modell patzt."""
-    fallback = {"suchbegriffe": frage, "dokumentart": None, "hinweis": None}
+    fallback = {"suchbegriffe": frage, "dokumentart": None}
     try:
         raw = generator.complete(
-            ANALYSE_PROMPT.replace("{frage}", frage), temperature=0.0
+            ANALYSE_PROMPT.replace("{frage}", frage),
+            temperature=0.0,
+            denkbudget=config.DENKBUDGET_ANALYSE,
         )
         match = _JSON_BLOCK.search(raw)
         if not match:
@@ -192,7 +207,8 @@ def ask(
 
     kontext, used = build_context(with_neighbours(db, hits, NEIGHBOUR_WINDOW))
     antwort = generator.complete(
-        ANSWER_PROMPT.replace("{kontext}", kontext).replace("{frage}", frage)
+        ANSWER_PROMPT.replace("{kontext}", kontext).replace("{frage}", frage),
+        denkbudget=config.DENKBUDGET_ANTWORT,
     )
     return {"analyse": analyse, "antwort": antwort, "quellen": used}
 

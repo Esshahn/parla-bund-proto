@@ -2,6 +2,7 @@
 // waere auf Vercel nicht verlaesslich - dort liegt kein Projektverzeichnis.
 import ANALYSE_PROMPT from '../../../prompts/analyse.de.txt?raw';
 import ANSWER_PROMPT from '../../../prompts/answer.de.txt?raw';
+import { DENKBUDGET_ANALYSE, DENKBUDGET_ANTWORT, TOP_K } from './config';
 import { embedQuery, generate, generateStream } from './gemini';
 import { quelle, search, withNeighbours, type Hit } from './retrieve';
 
@@ -13,7 +14,6 @@ import { quelle, search, withNeighbours, type Hit } from './retrieve';
  * sicher auseinander.
  */
 
-const TOP_K = 12;
 const NEIGHBOUR_WINDOW = 1;
 const MAX_CONTEXT_CHARS = 60_000;
 // Obergrenze je Belegstelle. Der Segmentierer erzeugt vereinzelt riesige
@@ -42,7 +42,6 @@ export const KEINE_TREFFER =
 export type Analyse = {
 	suchbegriffe: string;
 	dokumentart: string | null;
-	hinweis: string | null;
 };
 
 export type Quelle = {
@@ -65,9 +64,9 @@ export type Quelle = {
  * liefert - eine schlechtere Suche ist besser als gar keine Antwort.
  */
 export async function analyseQuery(frage: string): Promise<Analyse> {
-	const fallback: Analyse = { suchbegriffe: frage, dokumentart: null, hinweis: null };
+	const fallback: Analyse = { suchbegriffe: frage, dokumentart: null };
 	try {
-		const raw = await generate(fuelle(ANALYSE_PROMPT, { frage }), 0);
+		const raw = await generate(fuelle(ANALYSE_PROMPT, { frage }), 0, DENKBUDGET_ANALYSE);
 		const match = raw.match(/\{[\s\S]*\}/);
 		if (!match) return fallback;
 		const parsed = JSON.parse(match[0]) as Partial<Analyse>;
@@ -76,8 +75,7 @@ export async function analyseQuery(frage: string): Promise<Analyse> {
 			dokumentart:
 				parsed.dokumentart === 'Drucksache' || parsed.dokumentart === 'Plenarprotokoll'
 					? parsed.dokumentart
-					: null,
-			hinweis: parsed.hinweis ?? null
+					: null
 		};
 	} catch (error) {
 		console.warn('Query-Analyse fehlgeschlagen, nutze Rohfrage:', error);
@@ -135,10 +133,18 @@ export type AskEvent =
  * waehrend die Antwort noch entsteht.
  */
 export async function* ask(frage: string, topK = TOP_K): AsyncGenerator<AskEvent> {
+	// Das Einbetten haengt nicht von der Analyse ab - beide starten zugleich.
+	// Die Analyse ist die langsamere von beiden, das Embedding ist dann
+	// meist schon fertig, wenn es gebraucht wird.
+	const vektorLaeuft = embedQuery(frage);
+	// Ablehnung vormerken, damit Node nicht ueber eine unbehandelte warnt,
+	// falls die Analyse vorher scheitert. Das await unten wirft trotzdem.
+	vektorLaeuft.catch(() => {});
+
 	const analyse = await analyseQuery(frage);
 	yield { typ: 'analyse', analyse };
 
-	const vector = await embedQuery(frage);
+	const vector = await vektorLaeuft;
 	const hits = await search(
 		frage,
 		vector,
@@ -158,7 +164,7 @@ export async function* ask(frage: string, topK = TOP_K): AsyncGenerator<AskEvent
 	yield { typ: 'quellen', quellen };
 
 	const prompt = fuelle(ANSWER_PROMPT, { kontext, frage });
-	for await (const text of generateStream(prompt)) {
+	for await (const text of generateStream(prompt, 0.2, DENKBUDGET_ANTWORT)) {
 		yield { typ: 'text', text };
 	}
 	yield { typ: 'fertig' };

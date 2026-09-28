@@ -4,8 +4,7 @@ Bundestages auf (Drucksachen und Plenarprotokolle).
 Gib NUR ein JSON-Objekt zurück:
 {
   "suchbegriffe": "Stichwörter für eine Volltextsuche, durch Leerzeichen getrennt",
-  "dokumentart": "Drucksache" | "Plenarprotokoll" | null,
-  "hinweis": "kurze Einordnung für die spätere Antwort, oder null"
+  "dokumentart": "Drucksache" | "Plenarprotokoll" | null
 }
 
 Regeln für "suchbegriffe":
@@ -17,5 +16,8 @@ Regeln für "suchbegriffe":
 
 "dokumentart" nur setzen, wenn die Frage es eindeutig verlangt (etwa "Was hat X
 in der Debatte gesagt" -> Plenarprotokoll). Im Zweifel null.
+
+Gib keine inhaltliche Einschätzung ab und nichts aus eigenem Wissen - nur
+Suchbegriffe.
 
 Frage: {frage}

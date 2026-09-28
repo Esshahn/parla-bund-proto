@@ -111,6 +111,99 @@ fand „Rente" nicht. Die handgepflegte Stoppwortliste entfällt ebenfalls.
 **halfvec halbiert die Vektoren** bei praktisch unverändertem Rückruf. Das war
 nötig: mit float32 wäre die Datenbank bei ~3,8 GB statt ~2,4 GB gelandet.
 
+## Wo die Zeit hingeht (gemessen)
+
+Der Prototyp brauchte zunächst 13 bis 18 Sekunden je Frage. Die Vermutung lag
+bei der Datenbank — eine Messung je Stufe widerlegte das:
+
+| Stufe | vorher | Anteil |
+|---|---|---|
+| Query-Analyse (LLM) | 3.879 ms | 39 % |
+| Frage einbetten | 405 ms | 4 % |
+| Suche (beide parallel) | 254 ms | **3 %** |
+| Nachbar-Chunks | 26 ms | 0 % |
+| Antwort erzeugen | 5.359 ms | 54 % |
+
+**Die Datenbank war nie der Engpass.** 93 % der Zeit waren die beiden
+Modellaufrufe, und darin steckte vor allem das Nachdenken des Modells: Die
+Analyse dachte 488 Token, um 80 auszugeben; die Antwort dachte 2.289 Token und
+brauchte 10,6 Sekunden bis zum ersten Zeichen.
+
+Vier Eingriffe, jeder einzeln gemessen:
+
+1. **Denkbudget auf 0** für beide Aufrufe. Beide Aufgaben sind eng geführt —
+   Begriffe extrahieren, aus vorgelegten Stellen zitieren — nicht offenes
+   Schließen. Analyse 3,7 s → 1,4 s, Antwort 10,6 s → 1,3 s bis zum ersten
+   Zeichen.
+2. **Einbetten parallel zur Analyse.** Es hängt nicht von ihr ab; spart 0,4 s.
+3. **Feld `hinweis` aus der Analyse entfernt.** Es wurde nirgends verwendet,
+   kostete Ausgabetoken — und enthielt Weltwissen des Modells statt
+   Korpuswissen („Derzeitiger Amtsinhaber ist Olaf Scholz", sachlich falsch).
+4. **`top_k` von 12 auf 20** (siehe unten) — gegen Retrieval-Schwankungen,
+   nicht gegen Latenz.
+
+Ergebnis: **3,2 bis 4,8 Sekunden bis zum ersten Zeichen, 3,4 bis 5,7 Sekunden
+gesamt** — vorher 13 bis 18 Sekunden.
+
+Ein kleineres Modell (`gemini-3.1-flash-lite`) wurde verworfen: Es war zwar
+schnell, machte aus „Frühstartrente" aber die „Altersrente für besonders
+langjährig Versicherte" — ein anderes Thema.
+
+## Ein Fehler, den die Messung ans Licht brachte
+
+Dieselbe Frage wurde mal richtig, mal gar nicht beantwortet. Bei „Was wurde
+zuletzt zum Thema Mietpreise beschlossen?" nannte die Anwendung in etwa einem
+von drei Läufen das Gesetz vom 17. Juli 2025, sonst behauptete sie, die
+Belegstellen gäben nichts her.
+
+Die Ursache lag nicht beim Sprachmodell, sondern im Retrieval:
+
+- Die entscheidende Aussage steckt in **Chunk 234769** — einer Antwort auf eine
+  Kleine Anfrage zur *Wohnungslosigkeit*. Die Verlängerung der Mietpreisbremse
+  steht dort nur nebenbei.
+- Die **Vektorsuche findet ihn zuverlässig auf Rang 7**.
+- Die Rank Fusion mit Schnitt bei 12 warf ihn trotzdem hinaus, sobald die
+  Wortsuche viele eigene Kandidaten einbrachte.
+- Und die Wortsuche schwankte, weil die Query-Analyse bei jedem Lauf andere
+  Suchbegriffe lieferte — auch bei `temperature 0`.
+
+**Der Eingriff: `top_k` von 12 auf 20.** Die Mietpreis-Frage wird damit in 4
+von 5 Läufen richtig beantwortet statt in etwa einem von drei. Der zusätzliche
+Kontext kostet kaum Zeit — die Gesamtdauer bleibt bei 3,4 bis 5,7 Sekunden.
+
+### Ein fester Seed war die falsche Antwort
+
+Naheliegend wäre, die Analyse mit einem festen Seed reproduzierbar zu machen.
+Das funktioniert technisch (fünf identische Ausgaben in Folge), und mit Seed 42
+wurde die Mietpreis-Frage 5 von 5 Mal richtig beantwortet.
+
+Diese Messung war jedoch **zirkulär**: Mit festem Seed läuft fünfmal derselbe
+deterministische Pfad. Das belegt Reproduzierbarkeit, nicht Korrektheit.
+
+Die belastbare Prüfung vergleicht *verschiedene* Seeds über *mehrere* Fragen
+mit bekannten Zieldokumenten:
+
+| | Zieldokument in den Top 20, 6 Fragen |
+|---|---|
+| Seed 42 | 5 / 6 |
+| Seed 7 | 5 / 6 |
+| Seed 1, 99, 1234 | 6 / 6 |
+| ohne Seed, 5 Ziehungen | 6 / 6 (jedes Mal) |
+
+Seed 42 verfehlte das Wehrpflicht-Dokument **zuverlässig**, während es
+ungeseedet in jeder Ziehung gefunden wurde. Ein Seed friert eben eine einzelne
+Ziehung ein — ist sie für eine Frage schlecht, ist sie es dauerhaft.
+
+Den bestmessenden Seed zu nehmen wäre Überanpassung an sechs Fragen. Der Seed
+ist deshalb wieder draußen. Gegen die Schwankung hilft der Sache nach ein
+Re-Ranking der Kandidaten, nicht ein eingefrorener Zufall.
+
+**Nebenbei ein Lehrstück zur Messmethodik:** Ein erster Anlauf dieser Prüfung
+ergab 50 % Trefferquote für *alle* Varianten. Ursache war die Zielvorgabe —
+ich hatte einzelne Chunks als „richtig" festgelegt, darunter einen, der vom
+„Digitalcheck" handelt. Auf Dokumentebene gemessen liegt die Quote bei 83 bis
+100 %.
+
 ## Eine Grenze des Ansatzes
 
 **Tabellarische Dokumente sind kaum auffindbar.** Die Frage „Wie viel Geld ist
@@ -166,6 +259,19 @@ nächste Umbau.
 **Vorgangsverläufe fehlen.** `/vorgang` und `/vorgangsposition` verbinden
 Dokumente zu einem Verfahren. Damit ließe sich „Was ist aus dem Gesetz
 geworden?" beantworten — eine der naheliegendsten Bürgerfragen.
+
+## Was an Geschwindigkeit noch ginge
+
+**Analyse und Embedding zwischenspeichern.** Die Query-Analyse kostet weiter
+1,0 bis 2,5 Sekunden und liegt auf dem kritischen Pfad. Da sie seit dem Seed
+deterministisch ist, ließe sich das Ergebnis je Frage in Postgres ablegen. Für
+die Beispielfragen auf der Startseite, die immer wieder angeklickt werden,
+entfiele damit fast die gesamte Vorbereitungszeit.
+
+**Re-Ranking statt größerem `top_k`.** `top_k` 20 ist eine Notlösung: Wir
+schicken mehr Stellen ins Kontextfenster, statt die richtigen besser zu
+sortieren. Ein Re-Ranking der 80 Kandidaten auf die besten 12 wäre sauberer
+und vermutlich treffsicherer.
 
 ## Nächste Schritte
 

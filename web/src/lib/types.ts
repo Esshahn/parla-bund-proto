@@ -1,7 +1,6 @@
 export type Analyse = {
 	suchbegriffe: string;
 	dokumentart: string | null;
-	hinweis: string | null;
 };
 
 export type Quelle = {

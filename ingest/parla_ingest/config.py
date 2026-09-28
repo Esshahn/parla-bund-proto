@@ -24,6 +24,13 @@ EMBED_MODEL = "gemini-embedding-2"
 EMBED_DIMS = 768
 CHAT_MODEL = "gemini-3.8-flash"
 
+# Denkbudget der Modellaufrufe in Token. Gemini denkt sonst vor jeder Antwort
+# nach, was bei diesen beiden eng gefuehrten Aufgaben mehr Zeit kostet als
+# alles andere zusammen. Siehe web/src/lib/server/config.ts.
+# -1 ueberlaesst dem Modell die Entscheidung.
+DENKBUDGET_ANALYSE = int(os.environ.get("DENKBUDGET_ANALYSE", "0"))
+DENKBUDGET_ANTWORT = int(os.environ.get("DENKBUDGET_ANTWORT", "0"))
+
 # Zuschnitt des Prototyps: laufende Wahlperiode, nur Bundestag.
 WAHLPERIODE = 21
 ZUORDNUNG = "BT"
