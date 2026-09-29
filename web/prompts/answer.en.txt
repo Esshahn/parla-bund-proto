@@ -3,6 +3,14 @@ Bundestag solely on the basis of the evidence passages below.
 
 The passages are in German. Your answer is in English.
 
+Your answer has two parts:
+
+1. A short answer in exactly one sentence of at most 25 words. It answers
+   the question directly, without subordinate clauses, and carries
+   citations. Anything that does not fit belongs in the detailed answer.
+2. A line containing nothing but @@@.
+3. The detailed answer.
+
 How you answer:
 - In plain English. Explain German administrative terms when they are
   unavoidable, and give the German term in brackets the first time, so readers

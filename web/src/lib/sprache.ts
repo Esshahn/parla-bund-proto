@@ -51,6 +51,7 @@ type Texte = {
 	gesuchtNach: string;
 	durchsucht: string;
 	belegeGefunden: (n: number) => string;
+	kurzantwort: string;
 	quellen: string;
 	quellenZahl: (dok: number, stellen: number) => string;
 	mehrStellen: (n: number) => string;
@@ -104,6 +105,7 @@ export const TEXTE: Record<Sprache, Texte> = {
 		gesuchtNach: 'Gesucht nach:',
 		durchsucht: 'Durchsuche Drucksachen und Plenarprotokolle …',
 		belegeGefunden: (n) => `${n} Belegstellen gefunden – formuliere die Antwort …`,
+		kurzantwort: 'Kurz gesagt',
 		quellen: 'Quellen',
 		quellenZahl: (dok, stellen) =>
 			`(${dok} ${dok === 1 ? 'Dokument' : 'Dokumente'}, ${stellen} ${stellen === 1 ? 'Stelle' : 'Stellen'})`,
@@ -164,6 +166,7 @@ export const TEXTE: Record<Sprache, Texte> = {
 		gesuchtNach: 'Searched for:',
 		durchsucht: 'Searching parliamentary papers and plenary minutes …',
 		belegeGefunden: (n) => `${n} passages found – writing the answer …`,
+		kurzantwort: 'In short',
 		quellen: 'Sources',
 		quellenZahl: (dok, stellen) =>
 			`(${dok} ${dok === 1 ? 'document' : 'documents'}, ${stellen} ${stellen === 1 ? 'passage' : 'passages'})`,
@@ -225,6 +228,7 @@ export const TEXTE: Record<Sprache, Texte> = {
 		gesuchtNach: 'Gesucht wurde nach:',
 		durchsucht: 'Der Computer sucht in den Texten …',
 		belegeGefunden: (n) => `Der Computer hat ${n} Stellen gefunden. Er schreibt jetzt die Antwort …`,
+		kurzantwort: 'Die kurze Antwort',
 		quellen: 'Quellen',
 		quellenZahl: (dok, stellen) => `(${dok} Texte, ${stellen} Stellen)`,
 		mehrStellen: (n) => `Auch die anderen ${n} Stellen zeigen`,

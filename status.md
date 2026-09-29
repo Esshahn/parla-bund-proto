@@ -204,6 +204,33 @@ ich hatte einzelne Chunks als „richtig" festgelegt, darunter einen, der vom
 „Digitalcheck" handelt. Auf Dokumentebene gemessen liegt die Quote bei 83 bis
 100 %.
 
+## Kurzantwort vor der ausführlichen
+
+Jede Antwort beginnt jetzt mit einem Satz, der die Frage direkt beantwortet;
+darunter steht die ausführliche Fassung.
+
+**Beides kommt aus demselben Modellaufruf**, getrennt durch eine Zeile mit
+`@@@`. Ein zweiter Aufruf hätte rund eine Sekunde auf den kritischen Pfad
+gelegt. So ist es umgekehrt schneller: Die Kurzantwort steht gemessen nach
+**3,9 bis 4,7 Sekunden** — rund 1,4 Sekunden bevor die lange Fassung fertig
+ist. Wer nur sie liest, hat die Frage beantwortet.
+
+Zwei Fälle, die auseinandergehalten werden müssen, wenn keine Marke im Text
+steht:
+
+- **Während die Antwort läuft** baut sich die Kurzantwort gerade auf — alles
+  bis zur Marke ist Kurzantwort.
+- **Nach dem Ende** ist es entweder ein Verlaufseintrag von vor diesem Feature
+  oder das Modell hat die Marke nicht gesetzt. Dann ist der ganze Text die
+  ausführliche Antwort; ihn im Stil der Kurzantwort zu zeigen wäre irreführend.
+
+Die Längenvorgabe war nötig: Ohne sie lieferte das Modell Schachtelsätze von
+über 360 Zeichen. Mit „höchstens 25 Wörter, keine Nebensätze" liegen die
+Kurzantworten bei 14 bis 26 Wörtern.
+
+Zwischenablage und Rückmeldung bekommen die Antwort ohne Marke, als
+zusammenhängenden Text.
+
 ## Drei Sprachfassungen
 
 Ein Umschalter in der Seitenleiste wechselt zwischen **Deutsch**, **English**

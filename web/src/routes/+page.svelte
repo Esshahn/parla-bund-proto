@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import Antwort from '$lib/Antwort.svelte';
+	import { teileAntwort, zusammen } from '$lib/antwortteile';
 	import Quellenliste from '$lib/Quellenliste.svelte';
 	import Kopieren from '$lib/Kopieren.svelte';
 	import Rueckmeldung from '$lib/Rueckmeldung.svelte';
@@ -19,6 +20,8 @@
 	let hervorgehoben = $state<number | null>(null);
 	let gestellteFrage = $state('');
 	let alleQuellen = $state(false);
+
+	const teile = $derived(teileAntwort(antwort, laeuft));
 
 	// Zum Kontext gehoerten mehr Stellen, als die Antwort am Ende belegt.
 	// Wer die Antwort prueft, will die belegten sehen - der Rest ist Rauschen.
@@ -277,11 +280,28 @@
 
 				{#if antwort}
 					<div class="antwortfeld">
-						<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
+						{#if teile.kurz}
+							<p class="kurz__titel">{t.kurzantwort}</p>
+							<div class="kurz">
+								<Antwort text={teile.kurz} {quellen} onBelegKlick={zurQuelle} />
+							</div>
+						{/if}
+
+						{#if teile.lang}
+							<div class="lang" class:lang--allein={!teile.kurz}>
+								<Antwort text={teile.lang} {quellen} onBelegKlick={zurQuelle} />
+							</div>
+						{/if}
 					</div>
 					{#if !laeuft}
-						<Kopieren text={antwort} {quellen} {sprache} />
-						<Rueckmeldung frage={gestellteFrage} {antwort} {quellen} {analyse} {sprache} />
+						<Kopieren text={zusammen(antwort)} {quellen} {sprache} />
+						<Rueckmeldung
+							frage={gestellteFrage}
+							antwort={zusammen(antwort)}
+							{quellen}
+							{analyse}
+							{sprache}
+						/>
 					{/if}
 				{:else if laeuft}
 					<p class="warten">
@@ -511,6 +531,35 @@
 		font-size: 0.82rem;
 		line-height: 1.5;
 		color: var(--text-leise);
+	}
+
+	.kurz__titel {
+		margin: 0 0 0.35rem;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+		color: var(--text-leise);
+	}
+
+	/* Die Kurzantwort steht groesser und traegt die Hauptlast - wer nur sie
+	   liest, soll die Frage beantwortet haben. */
+	.kurz :global(.antwort) {
+		font-size: 1.22rem;
+		line-height: 1.6;
+	}
+
+	.lang {
+		margin-top: 1.1rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--rand);
+	}
+
+	/* Ohne Kurzantwort davor braucht die lange Fassung keine Trennlinie. */
+	.lang--allein {
+		margin-top: 0;
+		padding-top: 0;
+		border-top: none;
 	}
 
 	.antwortfeld {
