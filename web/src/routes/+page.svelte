@@ -1,6 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Antwort from '$lib/Antwort.svelte';
 	import Quellenliste from '$lib/Quellenliste.svelte';
+	import Seitenleiste from '$lib/Seitenleiste.svelte';
+	import * as verlauf from '$lib/verlauf';
+	import type { VerlaufEintrag } from '$lib/verlauf';
 	import type { AskEvent, Analyse, Quelle } from '$lib/types';
 
 	const BEISPIELE = [
@@ -35,6 +39,49 @@
 	const anzahlDokumente = $derived(
 		new Set(sichtbareQuellen.map((q) => `${q.dokumentart}-${q.dokumentnummer}`)).size
 	);
+
+	let eintraege = $state<VerlaufEintrag[]>([]);
+	let aktiveId = $state<string | null>(null);
+	let leisteOffen = $state(false);
+
+	// localStorage gibt es beim Serverrendern nicht.
+	onMount(() => {
+		eintraege = verlauf.laden();
+	});
+
+	function neueFrage() {
+		abbruch?.abort();
+		laeuft = false;
+		frage = '';
+		gestellteFrage = '';
+		antwort = '';
+		quellen = [];
+		analyse = null;
+		fehler = null;
+		hervorgehoben = null;
+		alleQuellen = false;
+		aktiveId = null;
+	}
+
+	/** Einen Eintrag wieder anzeigen, ohne ihn erneut zu beantworten. */
+	function ausVerlauf(eintrag: VerlaufEintrag) {
+		abbruch?.abort();
+		laeuft = false;
+		frage = eintrag.frage;
+		gestellteFrage = eintrag.frage;
+		antwort = eintrag.antwort;
+		quellen = eintrag.quellen;
+		analyse = eintrag.analyse;
+		fehler = null;
+		hervorgehoben = null;
+		alleQuellen = false;
+		aktiveId = eintrag.id;
+	}
+
+	function verlaufLeeren() {
+		eintraege = verlauf.leeren();
+		aktiveId = null;
+	}
 
 	let abbruch: AbortController | null = null;
 
@@ -104,6 +151,14 @@
 		} finally {
 			laeuft = false;
 		}
+
+		// Erst nach dem Lauf merken: eine abgebrochene oder gescheiterte
+		// Anfrage gehoert nicht in den Verlauf.
+		if (antwort && !fehler) {
+			const gemerkt = verlauf.merken({ frage: text, antwort, quellen, analyse });
+			eintraege = gemerkt.eintraege;
+			aktiveId = gemerkt.id;
+		}
 	}
 
 	function verarbeite(ereignis: AskEvent) {
@@ -121,145 +176,157 @@
 	}
 </script>
 
-<main>
-	<header class="kopf">
-		<p class="marke">
-			<span class="marke__name">Parla&nbsp;Bund</span>
-			<span class="marke__status">Prototyp</span>
-		</p>
-		<h1>Fragen an den Deutschen Bundestag</h1>
-		<p class="untertitel">
-			In Alltagssprache gefragt, mit Beleg aus Drucksachen und Plenarprotokollen
-			beantwortet.
-		</p>
-	</header>
+<div class="rahmen">
+	<Seitenleiste
+		{eintraege}
+		{aktiveId}
+		bind:offen={leisteOffen}
+		onNeueFrage={neueFrage}
+		onWaehlen={ausVerlauf}
+		onLeeren={verlaufLeeren}
+	/>
 
-	<form
-		class="suche"
-		onsubmit={(ereignis) => {
-			ereignis.preventDefault();
-			fragen(frage);
-		}}
-	>
-		<input
-			type="text"
-			bind:value={frage}
-			placeholder="Was möchten Sie wissen?"
-			aria-label="Ihre Frage an den Bundestag"
-			disabled={laeuft}
-		/>
-		<button type="submit" disabled={laeuft || !frage.trim()}>
-			{laeuft ? 'Sucht …' : 'Fragen'}
-		</button>
-	</form>
-
-	{#if !gestellteFrage && !laeuft}
-		<section class="beispiele">
-			<p class="beispiele__titel">Zum Ausprobieren:</p>
-			<ul>
-				{#each BEISPIELE as beispiel}
-					<li>
-						<button onclick={() => fragen(beispiel)}>{beispiel}</button>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/if}
-
-	{#if fehler}
-		<p class="fehler" role="alert">{fehler}</p>
-	{/if}
-
-	{#if gestellteFrage}
-		<section class="ergebnis">
-			{#if analyse?.suchbegriffe && analyse.suchbegriffe !== gestellteFrage}
-				<p class="gesucht">
-					Gesucht nach: <span>{analyse.suchbegriffe}</span>
+	<main>
+		<header class="kopf">
+			<button class="menue" onclick={() => (leisteOffen = true)} aria-label="Menü öffnen">
+				<span aria-hidden="true">☰</span>
+			</button>
+			<div>
+				<h1>Fragen an den Deutschen Bundestag</h1>
+				<p class="untertitel">
+					In Alltagssprache gefragt, mit Beleg aus Drucksachen und Plenarprotokollen
+					beantwortet.
 				</p>
-			{/if}
+			</div>
+		</header>
 
-			{#if antwort}
-				<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
-			{:else if laeuft}
-				<p class="warten">
-					{quellen.length
-						? `${quellen.length} Belegstellen gefunden – formuliere die Antwort …`
-						: 'Durchsuche Drucksachen und Plenarprotokolle …'}
-				</p>
-			{/if}
+		<form
+			class="suche"
+			onsubmit={(ereignis) => {
+				ereignis.preventDefault();
+				fragen(frage);
+			}}
+		>
+			<input
+				type="text"
+				bind:value={frage}
+				placeholder="Was möchten Sie wissen?"
+				aria-label="Ihre Frage an den Bundestag"
+				disabled={laeuft}
+			/>
+			<button type="submit" disabled={laeuft || !frage.trim()}>
+				{laeuft ? 'Sucht …' : 'Fragen'}
+			</button>
+		</form>
 
-			{#if sichtbareQuellen.length}
-				<h2 class="quellen__titel">
-					Quellen <span
-						>({anzahlDokumente}
-						{anzahlDokumente === 1 ? 'Dokument' : 'Dokumente'}, {sichtbareQuellen.length}
-						{sichtbareQuellen.length === 1 ? 'Stelle' : 'Stellen'})</span
-					>
-				</h2>
-				<Quellenliste quellen={sichtbareQuellen} {hervorgehoben} />
+		{#if !gestellteFrage && !laeuft}
+			<section class="beispiele">
+				<p class="beispiele__titel">Zum Ausprobieren:</p>
+				<ul>
+					{#each BEISPIELE as beispiel}
+						<li>
+							<button onclick={() => fragen(beispiel)}>{beispiel}</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 
-				{#if !laeuft && quellen.length > sichtbareQuellen.length}
-					<button class="mehr" onclick={() => (alleQuellen = true)}>
-						Auch die {quellen.length - sichtbareQuellen.length} Stellen zeigen, die
-						durchsucht, aber nicht belegt wurden
-					</button>
+		{#if fehler}
+			<p class="fehler" role="alert">{fehler}</p>
+		{/if}
+
+		{#if gestellteFrage}
+			<section class="ergebnis">
+				{#if analyse?.suchbegriffe && analyse.suchbegriffe !== gestellteFrage}
+					<p class="gesucht">
+						Gesucht nach: <span>{analyse.suchbegriffe}</span>
+					</p>
 				{/if}
-			{/if}
-		</section>
-	{/if}
 
-	<footer class="fuss">
-		<p>
-			Prototyp. Durchsucht werden Drucksachen und Plenarprotokolle der laufenden
-			Wahlperiode&nbsp;21 des Deutschen Bundestages, bezogen über die
-			<a href="https://dip.bundestag.de/%C3%BCber-dip/hilfe/api" target="_blank" rel="noopener"
-				>DIP-API</a
-			>.
-		</p>
-		<p>
-			Die Antworten erzeugt ein Sprachmodell und kann Fehler enthalten. Maßgeblich ist
-			allein das verlinkte Originaldokument – bitte prüfen Sie dort nach.
-		</p>
-	</footer>
-</main>
+				{#if antwort}
+					<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
+				{:else if laeuft}
+					<p class="warten">
+						{quellen.length
+							? `${quellen.length} Belegstellen gefunden – formuliere die Antwort …`
+							: 'Durchsuche Drucksachen und Plenarprotokolle …'}
+					</p>
+				{/if}
+
+				{#if sichtbareQuellen.length}
+					<h2 class="quellen__titel">
+						Quellen <span
+							>({anzahlDokumente}
+							{anzahlDokumente === 1 ? 'Dokument' : 'Dokumente'}, {sichtbareQuellen.length}
+							{sichtbareQuellen.length === 1 ? 'Stelle' : 'Stellen'})</span
+						>
+					</h2>
+					<Quellenliste quellen={sichtbareQuellen} {hervorgehoben} />
+
+					{#if !laeuft && quellen.length > sichtbareQuellen.length}
+						<button class="mehr" onclick={() => (alleQuellen = true)}>
+							Auch die {quellen.length - sichtbareQuellen.length} Stellen zeigen, die
+							durchsucht, aber nicht belegt wurden
+						</button>
+					{/if}
+				{/if}
+			</section>
+		{/if}
+
+		<footer class="fuss">
+			<p>
+				Prototyp. Durchsucht werden Drucksachen und Plenarprotokolle der laufenden
+				Wahlperiode&nbsp;21 des Deutschen Bundestages, bezogen über die
+				<a href="https://dip.bundestag.de/%C3%BCber-dip/hilfe/api" target="_blank" rel="noopener"
+					>DIP-API</a
+				>.
+			</p>
+			<p>
+				Die Antworten erzeugt ein Sprachmodell und kann Fehler enthalten. Maßgeblich ist
+				allein das verlinkte Originaldokument – bitte prüfen Sie dort nach.
+			</p>
+		</footer>
+	</main>
+</div>
 
 <style>
+	.rahmen {
+		display: flex;
+		align-items: flex-start;
+		min-height: 100vh;
+	}
+
 	main {
+		flex: 1;
+		min-width: 0;
 		max-width: var(--spalte);
 		margin: 0 auto;
 		padding: 2.5rem 16px 4rem;
 	}
 
 	.kopf {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
 		padding-bottom: 1.4rem;
 		border-bottom: 1px solid var(--rand);
 		margin-bottom: 1.6rem;
 	}
 
-	/* Wortmarke und Prototyp-Hinweis stehen zusammen: die Kennzeichnung soll
-	   nicht zu ueberlesen sein. */
-	.marke {
-		display: flex;
-		align-items: center;
-		gap: 0.7rem;
-		margin: 0 0 0.7rem;
-	}
-
-	.marke__name {
-		font-family: var(--serif);
-		font-size: 1.45rem;
-		letter-spacing: 0.01em;
-	}
-
-	.marke__status {
-		padding: 0.15rem 0.5rem;
-		background: var(--flaeche-kraeftig);
+	/* Nur unterhalb der Umbruchbreite sichtbar - darüber steht die Leiste
+	   ohnehin dauerhaft daneben. */
+	.menue {
+		display: none;
+		flex: none;
+		padding: 0.35rem 0.6rem;
 		border: 1px solid var(--rand);
-		font-size: 0.7rem;
-		font-weight: 600;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--text-leise);
+		border-radius: var(--radius);
+		background: var(--grund);
+		color: var(--text);
+		font-size: 1rem;
+		line-height: 1.2;
+		cursor: pointer;
 	}
 
 	h1 {
@@ -441,5 +508,15 @@
 
 	.fuss a {
 		color: inherit;
+	}
+
+	@media (max-width: 900px) {
+		.menue {
+			display: block;
+		}
+
+		main {
+			padding-top: 1.5rem;
+		}
 	}
 </style>
