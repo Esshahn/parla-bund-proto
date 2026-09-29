@@ -1,0 +1,242 @@
+{
+  "hinweis": "Testfragen für die Retrieval-Qualität. 'ziele' sind Dokumentnummern, die die Frage beantworten; getroffen gilt, wenn mindestens eine davon im Kontext landet. Fragen ohne 'ziele' sind Negativfälle: der Korpus gibt nichts her, die Anwendung muss das sagen statt zu raten.",
+  "fragen": [
+    {
+      "frage": "Soll das Wahlalter auf 16 Jahre gesenkt werden?",
+      "ziele": [
+        "21/6106"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Ändert sich etwas beim Mietrecht für Geschäftsräume?",
+      "ziele": [
+        "21/6807"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Was soll sich beim Behindertengleichstellungsgesetz ändern?",
+      "ziele": [
+        "21/5140"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Gibt es Pläne, das Reparieren von Geräten zu fördern?",
+      "ziele": [
+        "21/5923"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Was ist beim Wärmeplanungsgesetz geplant?",
+      "ziele": [
+        "21/6587"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Soll die Polizei mehr digitale Ermittlungsbefugnisse bekommen?",
+      "ziele": [
+        "21/6132"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Wird das Patientenrechtegesetz geändert?",
+      "ziele": [
+        "21/6916"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Was unternimmt die Regierung gegen Bürokratie beim Innenministerium?",
+      "ziele": [
+        "21/3620"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Was ist die Frühstartrente und wer bekommt sie?",
+      "ziele": [
+        "21/7864"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Wie soll der Wohnungsbau beschleunigt werden?",
+      "ziele": [
+        "21/781"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Soll das Produkthaftungsrecht modernisiert werden?",
+      "ziele": [
+        "21/4297"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Was ändert sich beim Düngerecht?",
+      "ziele": [
+        "21/6135"
+      ],
+      "art": "gesetz"
+    },
+    {
+      "frage": "Fordert jemand die Abschaffung der Erbschaftsteuer?",
+      "ziele": [
+        "21/2804"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Gibt es Vorstöße für kleine modulare Atomreaktoren?",
+      "ziele": [
+        "21/5324"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Was wird zu Nachtzugverbindungen gefordert?",
+      "ziele": [
+        "21/2901"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Unterstützt der Bundestag eine deutsche Olympia-Bewerbung?",
+      "ziele": [
+        "21/3029"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Gibt es einen Antrag zur Pflegeversicherung?",
+      "ziele": [
+        "21/5828"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Was wird für das Handwerk gefordert?",
+      "ziele": [
+        "21/6008"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Gibt es einen Antrag zur Legalisierung von Cannabis?",
+      "ziele": [
+        "21/3912"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Was wird zur Situation der Kommunen gefordert?",
+      "ziele": [
+        "21/4471",
+        "21/1554"
+      ],
+      "art": "antrag"
+    },
+    {
+      "frage": "Wie ist die Lage bei Arzneimittel-Lieferengpässen?",
+      "ziele": [
+        "21/171",
+        "21/338"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Wie viele Geflüchtete leben in Deutschland?",
+      "ziele": [
+        "21/3782"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Gibt es Probleme mit Zugverspätungen zwischen Hamburg und Berlin?",
+      "ziele": [
+        "21/7337"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Welche Folgen hatte der Hitzesommer?",
+      "ziele": [
+        "21/7915"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Wie steht es um die hausärztliche Versorgung?",
+      "ziele": [
+        "21/1018"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Darf im Bäckerhandwerk sonntags gearbeitet werden?",
+      "ziele": [
+        "21/5954"
+      ],
+      "art": "anfrage"
+    },
+    {
+      "frage": "Was wurde zuletzt zum Thema Mietpreise beschlossen?",
+      "ziele": [
+        "21/5885",
+        "21/322"
+      ],
+      "art": "gemischt"
+    },
+    {
+      "frage": "Wer ist Bundeskanzler?",
+      "ziele": [
+        "21/2"
+      ],
+      "art": "protokoll"
+    },
+    {
+      "frage": "Kriege ich Geld, wenn ich mir ein E-Auto kaufe?",
+      "ziele": [
+        "21/7446",
+        "21/5178",
+        "21/1600"
+      ],
+      "art": "gemischt"
+    },
+    {
+      "frage": "Wie positionieren sich die Fraktionen zur Wehrpflicht?",
+      "ziele": [
+        "21/1853",
+        "21/3077",
+        "21/48"
+      ],
+      "art": "protokoll"
+    },
+    {
+      "frage": "Wie hoch ist die Mehrwertsteuer auf Butter in Portugal?",
+      "ziele": [],
+      "art": "negativ"
+    },
+    {
+      "frage": "Wann wurde der Kölner Dom fertiggestellt?",
+      "ziele": [],
+      "art": "negativ"
+    },
+    {
+      "frage": "Was kostet ein Tesla Model 3?",
+      "ziele": [],
+      "art": "negativ"
+    },
+    {
+      "frage": "Welche Mannschaft hat die Fußball-Weltmeisterschaft 2026 gewonnen?",
+      "ziele": [],
+      "art": "negativ"
+    }
+  ]
+}

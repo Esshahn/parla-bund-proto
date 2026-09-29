@@ -109,7 +109,7 @@
 		flex: 1;
 		min-width: 0;
 		padding: 0.85rem 1rem;
-		border: 1px solid var(--rand);
+		border: 1px solid var(--rand-kraeftig);
 		border-right: none;
 		border-radius: var(--radius);
 		background: var(--grund);

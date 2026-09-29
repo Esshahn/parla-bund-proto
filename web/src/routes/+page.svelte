@@ -3,6 +3,7 @@
 	import Antwort from '$lib/Antwort.svelte';
 	import Quellenliste from '$lib/Quellenliste.svelte';
 	import Kopieren from '$lib/Kopieren.svelte';
+	import Rueckmeldung from '$lib/Rueckmeldung.svelte';
 	import Seitenleiste from '$lib/Seitenleiste.svelte';
 	import * as verlauf from '$lib/verlauf';
 	import type { VerlaufEintrag } from '$lib/verlauf';
@@ -83,6 +84,20 @@
 		eintraege = verlauf.leeren();
 		aktiveId = null;
 	}
+
+	// Wird einem Screenreader vorgelesen. Der Fliesstext der Antwort selbst
+	// waere als aria-live zu geschwaetzig - er kaeme Stueck fuer Stueck an.
+	const meldung = $derived(
+		fehler
+			? `Fehler: ${fehler}`
+			: laeuft
+				? quellen.length
+					? `${quellen.length} Belegstellen gefunden, Antwort wird formuliert.`
+					: 'Drucksachen und Plenarprotokolle werden durchsucht.'
+				: antwort
+					? `Antwort fertig, ${zitierte.size} Belege aus ${anzahlDokumente} Dokumenten.`
+					: ''
+	);
 
 	let abbruch: AbortController | null = null;
 
@@ -177,6 +192,8 @@
 	}
 </script>
 
+<a class="sprung" href="#inhalt">Zum Inhalt springen</a>
+
 <div class="rahmen">
 	<Seitenleiste
 		{eintraege}
@@ -187,7 +204,7 @@
 		onLeeren={verlaufLeeren}
 	/>
 
-	<main>
+	<main id="inhalt">
 		<header class="kopf">
 			<button class="menue" onclick={() => (leisteOffen = true)} aria-label="Menü öffnen">
 				<span aria-hidden="true">☰</span>
@@ -245,12 +262,15 @@
 					</p>
 				{/if}
 
+				<p class="nur-fuer-screenreader" role="status" aria-live="polite">{meldung}</p>
+
 				{#if antwort}
 					<div class="antwortfeld">
 						<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
 					</div>
 					{#if !laeuft}
 						<Kopieren text={antwort} {quellen} />
+						<Rueckmeldung frage={gestellteFrage} {antwort} {quellen} {analyse} />
 					{/if}
 				{:else if laeuft}
 					<p class="warten">
@@ -298,6 +318,34 @@
 </div>
 
 <style>
+	/* Sichtbar, sobald sie den Fokus bekommt - unsichtbar zu bleiben waere
+	   fuer sehende Tastaturnutzende nutzlos. */
+	.sprung {
+		position: absolute;
+		left: -9999px;
+		z-index: 30;
+		padding: 0.6rem 1rem;
+		background: var(--dunkel);
+		color: #fff;
+		text-decoration: none;
+	}
+
+	.sprung:focus {
+		left: 0.5rem;
+		top: 0.5rem;
+	}
+
+	.nur-fuer-screenreader {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
 	.rahmen {
 		display: flex;
 		align-items: flex-start;
@@ -327,7 +375,7 @@
 		display: none;
 		flex: none;
 		padding: 0.35rem 0.6rem;
-		border: 1px solid var(--rand);
+		border: 1px solid var(--rand-kraeftig);
 		border-radius: var(--radius);
 		background: var(--grund);
 		color: var(--text);
@@ -359,7 +407,8 @@
 		flex: 1;
 		min-width: 0;
 		padding: 0.85rem 1rem;
-		border: 1px solid var(--rand);
+		/* Bedienelement: WCAG verlangt 3:1 fuer die Umrandung. */
+		border: 1px solid var(--rand-kraeftig);
 		border-right: none;
 		border-radius: var(--radius);
 		background: var(--grund);

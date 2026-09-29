@@ -260,6 +260,91 @@ nächste Umbau.
 Dokumente zu einem Verfahren. Damit ließe sich „Was ist aus dem Gesetz
 geworden?" beantworten — eine der naheliegendsten Bürgerfragen.
 
+## Retrieval wird jetzt gemessen, nicht geschätzt
+
+`ingest/eval/fragen.json` enthält 34 Testfragen: 30 mit hinterlegten
+Zieldokumenten, 4 Negativfälle, die der Korpus nicht hergibt. `python -m
+parla_ingest eval` misst, ob das antwortende Dokument im Kontext landet.
+
+Zwei Vorkehrungen, beide aus eigenem Schaden gelernt:
+
+- **Analyse und Embedding werden zwischengespeichert.** Beim Vergleich zweier
+  Ranking-Verfahren variiert sonst nebenbei die Query-Analyse, und man misst
+  Rauschen statt der Änderung.
+- **Jede Variante läuft dreimal.** Ein einzelner Lauf hat schon zweimal zu
+  falschen Schlüssen geführt.
+
+Gemessen (30 Fragen, je drei Läufe):
+
+| Verfahren | Treffer | Median | ms |
+|---|---|---|---|
+| Rank Fusion, Vektor-Gewicht 0.5 | 20/30 | 67 % | 2100 |
+| Rank Fusion, Vektor-Gewicht 1.0 (vorher) | 28, 28, 28 | 93 % | 2103 |
+| **Rank Fusion, Vektor-Gewicht 1.5** | **29, 29, 29** | **97 %** | **2115** |
+| + LLM-Re-Ranking (60 Kandidaten) | 30, 30, 30 | 100 % | 3791 |
+| + LLM-Re-Ranking (alle ~80 Kandidaten) | 29, 28, 29 | 97 % | 3667 |
+
+**Übernommen ist das Vektor-Gewicht 1.5** — ein Treffer mehr für 12 ms. Es ist
+nicht bloß an den Testfragen abgelesen: Die Vektorsuche ist für eine Frage
+deterministisch, die Wortsuche schwankt mit den erzeugten Suchbegriffen. Die
+verlässlichere Seite höher zu gewichten hat einen sachlichen Grund.
+
+**Das Re-Ranking liegt bereit, ist aber nicht eingeschaltet.** Es bringt genau
+eine Frage mehr von dreißig und kostet 1,7 Sekunden. Bei n=30 ist ein
+Unterschied von einer Frage nicht belastbar — das sollte man entscheiden, wenn
+der Fragensatz größer ist oder die Rückmeldungen zeigen, dass die Qualität das
+Problem ist.
+
+Eine Vermutung von mir war dabei nachweislich falsch: Ich hatte angenommen,
+das Re-Ranking werde besser, wenn es alle Kandidaten sieht statt der
+vorsortierten 60. Das Gegenteil trat ein — mit der vollen Liste sinkt der
+Median von 30 auf 29, und das Ergebnis schwankt wieder zwischen den Läufen.
+
+## Barrierefreiheit
+
+Für ein Angebot des Bundestages gilt BITV 2.0, also WCAG 2.1 AA. Geprüft mit
+axe-core über vier Zustände (Anmeldung, Startseite, Info-Modal, Seite mit
+Antwort): **0 Verstöße**.
+
+Drei Dinge, die axe nicht findet, waren zu ergänzen:
+
+- **Sprungmarke zum Inhalt.** Ohne sie muss man mit der Tastatur durch die
+  ganze Verlaufsliste, um ans Suchfeld zu kommen (WCAG 2.4.1).
+- **Statusmeldungen.** Das Streaming lief für Screenreader stumm ab. Jetzt
+  sagt eine Live-Region an, dass gesucht wird und wann die Antwort samt
+  Belegzahl fertig ist (WCAG 4.1.3).
+- **Belegziffern.** „3, Schaltfläche" sagt nichts; jetzt „Beleg 3, zur Quelle
+  springen".
+
+Die Kontraste waren zu prüfen, weil wir die Farben vom DIP übernommen haben —
+und dessen Linkblau `#0080be` erfüllt den Standard selbst nicht:
+
+| | vorher | jetzt |
+|---|---|---|
+| Link auf Weiß | 4,35:1 ✗ | 5,36:1 ✓ |
+| Link auf Fläche | 3,99:1 ✗ | 4,91:1 ✓ |
+| Belegziffer | 3,81:1 ✗ | 4,70:1 ✓ |
+| Rand von Bedienelementen | 1,61:1 ✗ | 4,54:1 ✓ |
+
+`#0071a7` hat denselben Farbton und dieselbe Sättigung wie das DIP-Blau, nur
+dunkler. Dekorative Trennlinien bleiben bei `#cccccc`; die 3:1-Anforderung
+gilt für Bedienelemente.
+
+## Rückmeldung zu Antworten
+
+Unter jeder Antwort steht „War diese Antwort hilfreich?". Bei „Nein" folgt ein
+freiwilliges Textfeld — ohne das weiß niemand, was gefehlt hat.
+
+Gespeichert werden Frage, Antwort, Suchbegriffe, die belegten Dokumente und
+die Zahl der Fundstellen. Das ist ein bewusster Bruch mit der Regel, dass der
+Fragenverlauf im Browser bleibt: **Hier landet auf ausdrücklichen Klick etwas
+auf dem Server**, und die Oberfläche sagt das an Ort und Stelle. Ohne die Frage
+wäre eine Rückmeldung wertlos — „23 Daumen runter" nennt kein Problem.
+
+Die Suchbegriffe mitzuspeichern ist der eigentliche Gewinn: Bei einer
+schlechten Antwort sieht man sofort, ob schon die Übersetzung der Frage daneben
+lag oder erst das Retrieval.
+
 ## Was an Geschwindigkeit noch ginge
 
 **Analyse und Embedding zwischenspeichern.** Die Query-Analyse kostet weiter

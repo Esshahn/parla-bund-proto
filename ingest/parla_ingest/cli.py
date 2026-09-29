@@ -9,6 +9,7 @@
     python -m parla_ingest migrate-pg          # Daten nach Supabase umziehen
     python -m parla_ingest pg-index            # Indexe in Postgres anlegen
     python -m parla_ingest pg-resync           # geaenderte Dokumente nachziehen
+    python -m parla_ingest eval [--top-k N]    # Retrieval-Qualitaet messen
 """
 
 from __future__ import annotations
@@ -129,6 +130,17 @@ def cmd_pg_resync(_args: argparse.Namespace) -> None:
     resync()
 
 
+def cmd_eval(args: argparse.Namespace) -> None:
+    from .evaluate import bericht, bewerten
+
+    ergebnis = bewerten(
+        top_k=args.top_k,
+        vektor_gewicht=args.vektor_gewicht,
+        neu=args.neu,
+    )
+    bericht(ergebnis)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="parla_ingest", description="Ingest und Suche fuer Parla Bund"
@@ -188,6 +200,21 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser(
         "pg-resync", help="geaenderte Dokumente nach Postgres nachziehen"
     ).set_defaults(func=cmd_pg_resync)
+
+    p = sub.add_parser("eval", help="Retrieval gegen den Testfragensatz messen")
+    p.add_argument("--top-k", type=int, default=20)
+    p.add_argument(
+        "--vektor-gewicht",
+        type=float,
+        default=1.5,
+        help="Stimme der semantischen Liste in der Rank Fusion. Vorgabe 1.5 - "
+        "muss zu VEKTOR_GEWICHT in web/src/lib/server/config.ts passen, sonst "
+        "misst die Auswertung etwas anderes als der Betrieb tut.",
+    )
+    p.add_argument(
+        "--neu", action="store_true", help="Analyse und Embeddings neu erzeugen"
+    )
+    p.set_defaults(func=cmd_eval)
 
     sub.add_parser("stats", help="Stand des Index").set_defaults(func=cmd_stats)
 

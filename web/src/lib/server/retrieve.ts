@@ -1,3 +1,4 @@
+import { VEKTOR_GEWICHT } from './config';
 import { db } from './db';
 
 /**
@@ -115,9 +116,11 @@ export async function searchSemantic(
 export function fuse(lists: Record<string, Hit[]>, limit: number): Hit[] {
 	const merged = new Map<number, Hit>();
 	for (const [method, hits] of Object.entries(lists)) {
+		// Die semantische Liste bekommt mehr Stimme - siehe VEKTOR_GEWICHT.
+		const gewicht = method === 'vektor' ? VEKTOR_GEWICHT : 1;
 		hits.forEach((hit, index) => {
 			const existing = merged.get(hit.chunk_id) ?? hit;
-			existing.score += 1 / (RRF_K + index + 1);
+			existing.score += gewicht / (RRF_K + index + 1);
 			existing.found_by.push(method);
 			merged.set(hit.chunk_id, existing);
 		});

@@ -50,6 +50,23 @@ CREATE TABLE IF NOT EXISTS anfrage_limit (
     PRIMARY KEY (kennung, fenster)
 );
 
+-- Rueckmeldungen zu Antworten. Anders als der Fragenverlauf, der im Browser
+-- bleibt, landet hier bewusst etwas auf dem Server - aber nur, wenn jemand
+-- aktiv auf Daumen hoch oder runter drueckt. Ohne die Frage waere eine
+-- Rueckmeldung wertlos: "23 Daumen runter" sagt nicht, woran es lag.
+CREATE TABLE IF NOT EXISTS rueckmeldung (
+    id            BIGSERIAL PRIMARY KEY,
+    zeitpunkt     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    hilfreich     BOOLEAN     NOT NULL,
+    frage         TEXT        NOT NULL,
+    suchbegriffe  TEXT,
+    antwort       TEXT        NOT NULL,
+    -- Welche Dokumente belegt wurden, fuer die Auswertung ohne Volltexte.
+    belegte_dokumente TEXT[],
+    anzahl_stellen    INTEGER,
+    anmerkung     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS chunks (
     id          BIGINT PRIMARY KEY,
     document_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -110,6 +127,10 @@ INDEXES = [
     (
         "anfrage_limit_fenster_idx",
         "CREATE INDEX IF NOT EXISTS anfrage_limit_fenster_idx ON anfrage_limit (fenster)",
+    ),
+    (
+        "rueckmeldung_zeitpunkt_idx",
+        "CREATE INDEX IF NOT EXISTS rueckmeldung_zeitpunkt_idx ON rueckmeldung (zeitpunkt DESC)",
     ),
     (
         "chunks_embedding_idx",

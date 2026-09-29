@@ -40,7 +40,7 @@
 <!-- Ohne Zeilenumbrueche zwischen den Bloecken: die Einrueckung im Template
      waere echter Text und wuerde mit white-space: pre-wrap als Luecke vor dem
      Satzzeichen sichtbar. -->
-<p class="antwort">{#each teile as teil}{#if teil.art === 'text'}{teil.wert}{:else if bekannt.has(teil.nummer)}<button class="beleg" onclick={() => onBelegKlick(teil.nummer)} title="Zur Quelle springen">{teil.nummer}</button>{:else}<span class="beleg beleg--unbekannt" title="Diese Quelle gibt es nicht">{teil.nummer}</span>{/if}{/each}</p>
+<p class="antwort">{#each teile as teil}{#if teil.art === 'text'}{teil.wert}{:else if bekannt.has(teil.nummer)}<button class="beleg" onclick={() => onBelegKlick(teil.nummer)} aria-label="Beleg {teil.nummer}, zur Quelle springen">{teil.nummer}</button>{:else}<span class="beleg beleg--unbekannt" title="Diese Quelle gibt es nicht" aria-label="Beleg {teil.nummer} – diese Quelle gibt es nicht">{teil.nummer}</span>{/if}{/each}</p>
 
 <style>
 	.antwort {

@@ -37,15 +37,21 @@
 		--grund: #ffffff;
 		--flaeche: #f5f5f5;
 		--flaeche-kraeftig: #eeeeee;
+		/* Haarlinien zur Gliederung. Fuer Bedienelemente verlangt WCAG 3:1,
+		   das erreicht #cccccc nicht (1,61:1) - dort gilt --rand-kraeftig. */
 		--rand: #cccccc;
+		--rand-kraeftig: #767676;
 		--text: #000000;
 		--text-leise: #555555;
 
 		/* Primärfläche des DIP – Buttons und Kopfleiste */
 		--dunkel: #31505f;
 		--dunkel-hell: #3d6275;
-		/* Linkfarbe des DIP */
-		--akzent: #0080be;
+		/* Linkfarbe, abgeleitet vom DIP (#0080be) - gleicher Farbton (200°),
+		   gleiche Sättigung, nur dunkler. Das Original erreicht auf Weiß nur
+		   4,35:1 und verfehlt damit WCAG AA (4,5:1); auf unserer Fläche sind
+		   es 3,99:1. #0071a7 kommt auf 5,36:1 bzw. 4,91:1. */
+		--akzent: #0071a7;
 		--akzent-flaeche: #e6f2f8;
 
 		/* Das DIP arbeitet durchgehend ohne Rundungen. */

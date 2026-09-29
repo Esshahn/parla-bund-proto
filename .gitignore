@@ -21,3 +21,6 @@ data/
 # System
 .DS_Store
 *.log
+
+# Zwischenspeicher der Evaluation (wird bei Bedarf neu erzeugt)
+ingest/eval/.cache.json

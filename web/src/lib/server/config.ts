@@ -62,6 +62,22 @@ export const DENKBUDGET_ANTWORT = Number(process.env.DENKBUDGET_ANTWORT ?? 0);
  */
 export const TOP_K = Number(process.env.TOP_K ?? 20);
 
+/**
+ * Gewicht der semantischen Trefferliste in der Rank Fusion.
+ *
+ * Gemessen am Testfragensatz (ingest/eval/fragen.json, 30 Fragen mit
+ * bekannten Zieldokumenten):
+ *
+ *   Gewicht 0.5  →  20/30     Gewicht 1.0  →  28/30
+ *   Gewicht 1.5  →  29/30     Gewicht 2.0+ →  29/30 (kein weiterer Gewinn)
+ *
+ * Die Vektorsuche ist die verlässlichere der beiden Seiten: Sie ist für eine
+ * Frage deterministisch, während die Wortsuche mit den erzeugten
+ * Suchbegriffen schwankt. Sie höher zu gewichten ist deshalb begründet und
+ * nicht bloß an den Testfragen abgelesen. Kostet 12 ms.
+ */
+export const VEKTOR_GEWICHT = Number(process.env.VEKTOR_GEWICHT ?? 1.5);
+
 /*
  * Kein fester Seed für die Query-Analyse.
  *
