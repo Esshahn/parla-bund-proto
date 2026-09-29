@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import Antwort from '$lib/Antwort.svelte';
 	import Quellenliste from '$lib/Quellenliste.svelte';
+	import Kopieren from '$lib/Kopieren.svelte';
 	import Seitenleiste from '$lib/Seitenleiste.svelte';
 	import * as verlauf from '$lib/verlauf';
 	import type { VerlaufEintrag } from '$lib/verlauf';
@@ -245,9 +246,15 @@
 				{/if}
 
 				{#if antwort}
-					<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
+					<div class="antwortfeld">
+						<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
+					</div>
+					{#if !laeuft}
+						<Kopieren text={antwort} {quellen} />
+					{/if}
 				{:else if laeuft}
 					<p class="warten">
+						<span class="spinner" aria-hidden="true"></span>
 						{quellen.length
 							? `${quellen.length} Belegstellen gefunden – formuliere die Antwort …`
 							: 'Durchsuche Drucksachen und Plenarprotokolle …'}
@@ -448,9 +455,50 @@
 		font-size: 0.95em;
 	}
 
+	/* Die Antwort ist das Ergebnis und soll sich vom Beiwerk absetzen -
+	   ohne Kasten, nur durch Flaeche und eine Kante in der Primaerfarbe. */
+	.antwortfeld {
+		padding: 1.1rem 1.3rem;
+		border-left: 3px solid var(--dunkel);
+		background: var(--flaeche);
+	}
+
 	.warten {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
 		color: var(--text-leise);
 		font-style: italic;
+	}
+
+	.spinner {
+		flex: none;
+		width: 1em;
+		height: 1em;
+		border: 2px solid var(--rand);
+		border-top-color: var(--dunkel);
+		border-radius: 50%;
+		animation: drehen 0.8s linear infinite;
+	}
+
+	@keyframes drehen {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* Wer Bewegung im System abbestellt hat, bekommt ein Pulsieren statt
+	   einer Drehung. */
+	@media (prefers-reduced-motion: reduce) {
+		.spinner {
+			animation: pulsieren 1.4s ease-in-out infinite;
+		}
+
+		@keyframes pulsieren {
+			50% {
+				opacity: 0.35;
+			}
+		}
 	}
 
 	.quellen__titel {

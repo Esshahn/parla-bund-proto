@@ -1,5 +1,12 @@
 <script lang="ts">
+	// ?raw statt <img>: nur eingebettet erbt das SVG die Textfarbe per
+	// currentColor. Das Original ist fuer dunkle Hintergruende gezeichnet und
+	// waere auf der hellen Leiste unsichtbar.
+	import citylab from './assets/citylab-berlin.svg?raw';
+	import Informationen from './Informationen.svelte';
 	import type { VerlaufEintrag } from './verlauf';
+
+	let infoOffen = $state(false);
 
 	let {
 		eintraege,
@@ -91,10 +98,26 @@
 		{/if}
 	</div>
 
-	<p class="fuss">
-		Der Verlauf liegt nur in diesem Browser – nicht auf dem Server.
-	</p>
+	<div class="fuss">
+		<button class="info" onclick={() => (infoOffen = true)}>Informationen</button>
+
+		<p class="hinweis">Der Verlauf liegt nur in diesem Browser – nicht auf dem Server.</p>
+
+		<p class="urheber">Entwickelt vom</p>
+		<a
+			class="citylab"
+			href="https://citylab-berlin.org"
+			target="_blank"
+			rel="noopener"
+			aria-label="CityLAB Berlin"
+		>
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+			{@html citylab}
+		</a>
+	</div>
 </aside>
+
+<Informationen bind:offen={infoOffen} />
 
 {#if offen}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -222,7 +245,7 @@
 	}
 
 	.leer,
-	.fuss {
+	.hinweis {
 		font-size: 0.78rem;
 		line-height: 1.5;
 		color: var(--text-leise);
@@ -288,9 +311,50 @@
 	}
 
 	.fuss {
-		margin: 1.2rem 0 0;
-		padding-top: 0.8rem;
+		margin-top: 1.4rem;
+		padding-top: 0.9rem;
 		border-top: 1px solid var(--rand);
+	}
+
+	.info {
+		display: block;
+		padding: 0;
+		margin-bottom: 0.7rem;
+		border: none;
+		background: none;
+		color: var(--akzent);
+		font: inherit;
+		font-size: 0.85rem;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+
+	.hinweis {
+		margin: 0 0 1.1rem;
+	}
+
+	.urheber {
+		margin: 0 0 0.4rem;
+		font-size: 0.72rem;
+		letter-spacing: 0.03em;
+		color: var(--text-leise);
+	}
+
+	/* Das SVG traegt fill="currentColor" - die Farbe kommt von hier. */
+	.citylab {
+		display: block;
+		color: var(--dunkel);
+	}
+
+	.citylab :global(svg) {
+		display: block;
+		width: 4.25rem;
+		height: auto;
+	}
+
+	.citylab:hover {
+		color: var(--akzent);
 	}
 
 	.schleier {
