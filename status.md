@@ -204,6 +204,58 @@ ich hatte einzelne Chunks als „richtig" festgelegt, darunter einen, der vom
 „Digitalcheck" handelt. Auf Dokumentebene gemessen liegt die Quote bei 83 bis
 100 %.
 
+## Drei Sprachfassungen
+
+Ein Umschalter in der Seitenleiste wechselt zwischen **Deutsch**, **English**
+und **Leichter Sprache**. Er wirkt auf beides: die Oberfläche und die Antwort.
+
+| | |
+|---|---|
+| Oberflächentexte | `web/src/lib/sprache.ts` |
+| Inhalt des Info-Fensters | `web/src/lib/infotexte.ts` |
+| Antwort-Prompts | `web/prompts/answer.{de,en,ls}.txt` |
+
+**Die Suche bleibt in jeder Sprache deutsch.** Das ist keine Nachlässigkeit,
+sondern notwendig: Der Korpus ist deutsch, die Volltextsuche stemmt deutsch.
+Die Query-Analyse erzeugt deshalb auch aus einer englischen Frage deutsche
+Suchbegriffe — „electric car subsidy" wird zu „Umweltbonus Kaufprämie
+Elektrofahrzeug Förderung", nicht Wort für Wort übersetzt.
+
+Zwei Einschränkungen benennt die Oberfläche selbst, weil sie sonst untergehen:
+
+- **Bei englischen Antworten** steht über der Antwort, dass die zitierten
+  Dokumente deutsch bleiben. Die Belegkette ist sonst für jemanden, der die
+  Antwort auf Englisch braucht, nicht nachprüfbar.
+- **Bei Leichter Sprache** steht dort, dass ein Computer sie erzeugt hat und
+  kein Mensch sie geprüft hat. „Leichte Sprache" ist ein Begriff mit eigenem
+  Regelwerk (DIN SPEC 33429) und wird normalerweise von der Zielgruppe
+  geprüft. Was hier entsteht, ist eine maschinelle Annäherung.
+
+Das englische Antwort-Prompt verlangt außerdem, den deutschen Fachbegriff beim
+ersten Vorkommen in Klammern mitzugeben — sonst findet man ihn im verlinkten
+Dokument nicht wieder.
+
+Das Prompt für Leichte Sprache verlangte zunächst eine eigene Zeile je Satz —
+das ist zwar eine verbreitete Regel der Leichten Sprache, sah in der Anwendung
+aber wie ein Umbruchfehler aus und wurde als solcher gemeldet. Die Antwort ist
+jetzt Fließtext; die übrigen Regeln (kurze Sätze, getrennte Wörter, keine
+Fremdwörter) bleiben.
+
+**Belegziffern beim Markieren.** Wer die Antwort mit der Maus markiert und
+kopiert, bekam aus `[16][21]` die Zeichenfolge `1621` — die Ziffern sind
+Schaltflächen, die Klammern waren nur Zeichnung. Jetzt stecken die Klammern
+als unsichtbarer Text in der Schaltfläche: Eine Auswahl liefert wieder
+`[16][21]`, vorgelesen wird weiterhin das aria-label. Die beiden
+Kopier-Schaltflächen waren davon nie betroffen.
+
+Zwei Fehler, die beim Testen auffielen:
+
+- Die Sprachwahl überlebte kein Neuladen. Der Effekt, der sie speichert, lief
+  beim Mounten mit dem Vorgabewert los und überschrieb den gemerkten, bevor
+  `onMount` ihn setzen konnte.
+- Seitenleiste und Seite benutzten beide die Klasse `.fuss`. Svelte kapselt
+  die Stile, aber Tests und spätere Änderungen greifen daneben.
+
 ## Eine Grenze des Ansatzes
 
 **Tabellarische Dokumente sind kaum auffindbar.** Die Frage „Wie viel Geld ist

@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { ask } from '$lib/server/rag';
 import { pruefeLimit } from '$lib/server/ratelimit';
+import { SPRACHEN, type Sprache } from '$lib/sprache';
 import { ANFRAGEN_PRO_MINUTE } from '$lib/server/config';
 
 /**
@@ -28,7 +29,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		);
 	}
 
-	const { frage } = (await request.json()) as { frage?: string };
+	const { frage, sprache } = (await request.json()) as {
+		frage?: string;
+		sprache?: Sprache;
+	};
+	const gewaehlt: Sprache = SPRACHEN.includes(sprache as Sprache) ? (sprache as Sprache) : 'de';
 
 	if (!frage?.trim()) {
 		return new Response(JSON.stringify({ fehler: 'Keine Frage übergeben.' }), {
@@ -43,7 +48,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			const send = (payload: unknown) =>
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
 			try {
-				for await (const event of ask(frage.trim())) {
+				for await (const event of ask(frage.trim(), undefined, gewaehlt)) {
 					send(event);
 				}
 			} catch (error) {

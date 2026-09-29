@@ -1,5 +1,35 @@
 <script lang="ts">
-	let { offen = $bindable() }: { offen: boolean } = $props();
+	import { INFOTEXTE } from './infotexte';
+	import { TEXTE, type Sprache } from './sprache';
+
+	let {
+		offen = $bindable(),
+		sprache = 'de'
+	}: { offen: boolean; sprache?: Sprache } = $props();
+
+	const t = $derived(TEXTE[sprache]);
+	const i = $derived(INFOTEXTE[sprache]);
+
+	const PARLA = 'https://www.parla.berlin';
+	const DIP = 'https://dip.bundestag.de/%C3%BCber-dip/hilfe/api';
+
+	/**
+	 * Zerlegt einen Text an den Platzhaltern {parla} und {dip}, damit die
+	 * Links im Fliesstext stehen koennen, ohne dass die Uebersetzungen HTML
+	 * enthalten muessen.
+	 */
+	function teile(text: string): { art: 'text' | 'parla' | 'dip'; wert: string }[] {
+		return text
+			.split(/(\{parla\}|\{dip\})/)
+			.filter(Boolean)
+			.map((stueck) =>
+				stueck === '{parla}'
+					? ({ art: 'parla', wert: '' } as const)
+					: stueck === '{dip}'
+						? ({ art: 'dip', wert: '' } as const)
+						: ({ art: 'text', wert: stueck } as const)
+			);
+	}
 
 	let dialog = $state<HTMLDialogElement | null>(null);
 
@@ -14,80 +44,50 @@
 
 <dialog bind:this={dialog} onclose={() => (offen = false)} aria-labelledby="info-titel">
 	<div class="kopf">
-		<h2 id="info-titel">Über diesen Prototyp</h2>
-		<button onclick={() => (offen = false)} aria-label="Schließen">×</button>
+		<h2 id="info-titel">{i.titel}</h2>
+		<button onclick={() => (offen = false)} aria-label={t.menueSchliessen}>×</button>
 	</div>
 
 	<div class="inhalt">
-		<h3>Worum es geht</h3>
-		<p>
-			Parla&nbsp;Bund beantwortet Fragen zur Arbeit des Deutschen Bundestages in
-			Alltagssprache und weist zu jeder Aussage die Drucksache oder das Plenarprotokoll
-			nach, auf der sie beruht. Vorbild ist
-			<a href="https://www.parla.berlin" target="_blank" rel="noopener">Parla</a> des
-			CityLAB Berlin, das dasselbe für das Berliner Abgeordnetenhaus tut.
-		</p>
-		<p>
-			Der Zugang zu Parlamentsdokumenten setzt bisher viel Vorwissen voraus: über
-			Dokumentarten, ihren Aufbau und die Suchfunktionen. Wer nicht weiß, in welchem
-			Dokument die Antwort steht, sucht lange. Genau diese Hürde soll wegfallen.
-		</p>
+		<h3>{i.worumTitel}</h3>
+		{#each i.worum as absatz}
+			<p>
+				{#each teile(absatz) as stueck}{#if stueck.art === 'text'}{stueck.wert}{:else if stueck.art === 'parla'}<a
+							href={PARLA}
+							target="_blank"
+							rel="noopener">{i.parlaLink}</a
+						>{:else}<a href={DIP} target="_blank" rel="noopener">{i.dipLink}</a>{/if}{/each}
+			</p>
+		{/each}
 
-		<h3>Wie es funktioniert</h3>
+		<h3>{i.wieTitel}</h3>
 		<ol>
-			<li>
-				<strong>Korpus aufbauen.</strong> Die
-				<a href="https://dip.bundestag.de/%C3%BCber-dip/hilfe/api" target="_blank" rel="noopener"
-					>DIP-API</a
-				> des Bundestages kennt keine Volltextsuche, nur Filter nach Wahlperiode und
-				Dokumenttyp. Deshalb werden alle Drucksachen und Plenarprotokolle einmal
-				heruntergeladen, von Satz- und Trennfehlern der PDF-Extraktion befreit und in
-				rund 1.200 Zeichen lange Abschnitte zerlegt. Plenarprotokolle werden zuerst an
-				den Rednerwechseln geschnitten, damit erhalten bleibt, wer etwas gesagt hat.
-			</li>
-			<li>
-				<strong>Frage übersetzen.</strong> Parlamentsdokumente sind in
-				Verwaltungssprache geschrieben. Ein Sprachmodell übersetzt die Frage deshalb
-				zuerst in dieses Vokabular – aus „Geld fürs E-Auto“ wird „Umweltbonus
-				Kaufprämie Elektrofahrzeug Förderung“.
-			</li>
-			<li>
-				<strong>Zweifach suchen.</strong> Eine Wortsuche findet Eigennamen,
-				Drucksachennummern und Fachbegriffe exakt. Eine Bedeutungssuche findet
-				Passagen, die inhaltlich passen, auch bei anderer Wortwahl. Beide laufen
-				gleichzeitig; die Ergebnisse werden zusammengeführt.
-			</li>
-			<li>
-				<strong>Antworten – nur aus den Fundstellen.</strong> Das Sprachmodell erhält
-				ausschließlich die gefundenen Passagen und muss jede Aussage mit einer
-				Belegziffer versehen. Eigenes Wissen darf es nicht ergänzen. Findet die Suche
-				nichts Passendes, sagt die Anwendung das, statt zu raten.
-			</li>
+			{#each i.schritte as schritt}
+				<li>
+					<strong>{schritt.kopf}</strong>
+					{#each teile(' ' + schritt.text) as stueck}{#if stueck.art === 'text'}{stueck.wert}{:else if stueck.art === 'parla'}<a
+								href={PARLA}
+								target="_blank"
+								rel="noopener">{i.parlaLink}</a
+							>{:else}<a href={DIP} target="_blank" rel="noopener">{i.dipLink}</a>{/if}{/each}
+				</li>
+			{/each}
 		</ol>
 
-		<h3>Was er noch nicht kann</h3>
+		<h3>{i.grenzenTitel}</h3>
 		<ul>
-			<li>
-				Durchsucht wird nur die <strong>laufende Wahlperiode&nbsp;21</strong> des
-				Bundestages. Ältere Vorgänge und Dokumente des Bundesrates fehlen.
-			</li>
-			<li>
-				Zahlen aus <strong>Tabellen</strong> – etwa einzelne Haushaltsposten – findet
-				die Suche schlecht. Eine Rede über den Haushalt ähnelt der Frage stärker als
-				eine Zahlenkolonne.
-			</li>
-			<li>
-				Die Antwort erzeugt ein <strong>Sprachmodell und kann Fehler enthalten</strong>.
-				Maßgeblich ist immer das verlinkte Originaldokument.
-			</li>
-			<li>Vorgangsverläufe („Was ist aus dem Gesetz geworden?“) sind noch nicht abgebildet.</li>
+			{#each i.grenzen as grenze}
+				<li>{grenze}</li>
+			{/each}
 		</ul>
 
-		<h3>Daten und Verlauf</h3>
+		<h3>{i.datenTitel}</h3>
 		<p>
-			Alle Dokumente stammen vom Deutschen Bundestag und sind öffentlich. Der
-			Fragenverlauf wird ausschließlich in Ihrem Browser gespeichert und nicht an den
-			Server übertragen; „Fragenverlauf löschen“ entfernt ihn vollständig.
+			{#each teile(i.daten) as stueck}{#if stueck.art === 'text'}{stueck.wert}{:else if stueck.art === 'parla'}<a
+						href={PARLA}
+						target="_blank"
+						rel="noopener">{i.parlaLink}</a
+					>{:else}<a href={DIP} target="_blank" rel="noopener">{i.dipLink}</a>{/if}{/each}
 		</p>
 	</div>
 </dialog>

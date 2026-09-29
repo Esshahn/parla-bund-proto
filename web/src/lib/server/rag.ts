@@ -1,7 +1,10 @@
 // ?raw bindet die Datei beim Bauen in das Bundle ein. Ein Lesen zur Laufzeit
 // waere auf Vercel nicht verlaesslich - dort liegt kein Projektverzeichnis.
 import ANALYSE_PROMPT from '../../../prompts/analyse.de.txt?raw';
-import ANSWER_PROMPT from '../../../prompts/answer.de.txt?raw';
+import ANTWORT_DE from '../../../prompts/answer.de.txt?raw';
+import ANTWORT_EN from '../../../prompts/answer.en.txt?raw';
+import ANTWORT_LS from '../../../prompts/answer.ls.txt?raw';
+import type { Sprache } from '../sprache';
 import { DENKBUDGET_ANALYSE, DENKBUDGET_ANTWORT, TOP_K } from './config';
 import { embedQuery, generate, generateStream } from './gemini';
 import { quelle, search, withNeighbours, type Hit } from './retrieve';
@@ -34,6 +37,26 @@ function fuelle(vorlage: string, werte: Record<string, string>): string {
 	}
 	return ergebnis;
 }
+
+/** Die Suche bleibt in jeder Sprache dieselbe - nur die Antwort wechselt. */
+const ANTWORT_PROMPT: Record<Sprache, string> = {
+	de: ANTWORT_DE,
+	en: ANTWORT_EN,
+	ls: ANTWORT_LS
+};
+
+const OHNE_TREFFER: Record<Sprache, string> = {
+	de:
+		'Dazu finde ich im durchsuchten Bestand nichts. Der Prototyp umfasst nur die ' +
+		'laufende Wahlperiode 21 des Bundestages – ältere Vorgänge sind nicht enthalten.',
+	en:
+		'I cannot find anything on this in the material searched. The prototype covers ' +
+		'only the current 21st electoral term of the Bundestag – earlier proceedings are ' +
+		'not included.',
+	ls:
+		'Dazu finde ich nichts. Der Computer sucht nur in Texten aus dieser Wahl-Periode. ' +
+		'Ältere Texte sind nicht dabei.'
+};
 
 export const KEINE_TREFFER =
 	'Dazu finde ich im durchsuchten Bestand nichts. Der Prototyp umfasst nur die ' +
@@ -132,7 +155,11 @@ export type AskEvent =
  * Antworttext raus, damit die Oberflaeche die Belege schon anzeigen kann,
  * waehrend die Antwort noch entsteht.
  */
-export async function* ask(frage: string, topK = TOP_K): AsyncGenerator<AskEvent> {
+export async function* ask(
+	frage: string,
+	topK = TOP_K,
+	sprache: Sprache = 'de'
+): AsyncGenerator<AskEvent> {
 	// Das Einbetten haengt nicht von der Analyse ab - beide starten zugleich.
 	// Die Analyse ist die langsamere von beiden, das Embedding ist dann
 	// meist schon fertig, wenn es gebraucht wird.
@@ -155,7 +182,7 @@ export async function* ask(frage: string, topK = TOP_K): AsyncGenerator<AskEvent
 
 	if (hits.length === 0) {
 		yield { typ: 'quellen', quellen: [] };
-		yield { typ: 'text', text: KEINE_TREFFER };
+		yield { typ: 'text', text: OHNE_TREFFER[sprache] };
 		yield { typ: 'fertig' };
 		return;
 	}
@@ -163,7 +190,7 @@ export async function* ask(frage: string, topK = TOP_K): AsyncGenerator<AskEvent
 	const { kontext, quellen } = buildContext(await withNeighbours(hits, NEIGHBOUR_WINDOW));
 	yield { typ: 'quellen', quellen };
 
-	const prompt = fuelle(ANSWER_PROMPT, { kontext, frage });
+	const prompt = fuelle(ANTWORT_PROMPT[sprache], { kontext, frage });
 	for await (const text of generateStream(prompt, 0.2, DENKBUDGET_ANTWORT)) {
 		yield { typ: 'text', text };
 	}

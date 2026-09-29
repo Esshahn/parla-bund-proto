@@ -1,7 +1,14 @@
 <script lang="ts">
+	import { TEXTE, type Sprache } from './sprache';
 	import type { Quelle } from './types';
 
-	let { text, quellen }: { text: string; quellen: Quelle[] } = $props();
+	let {
+		text,
+		quellen,
+		sprache = 'de'
+	}: { text: string; quellen: Quelle[]; sprache?: Sprache } = $props();
+
+	const t = $derived(TEXTE[sprache]);
 
 	let gemeldet = $state<string | null>(null);
 	let melderUhr: ReturnType<typeof setTimeout> | undefined;
@@ -36,10 +43,10 @@
 		const inhalt = was === 'ohne' ? ohneQuellen() : mitQuellen();
 		try {
 			await navigator.clipboard.writeText(inhalt);
-			melde(was === 'ohne' ? 'Antwort kopiert' : 'Antwort mit Quellen kopiert');
+			melde(was === 'ohne' ? t.kopiert : t.kopiertMitQuellen);
 		} catch {
 			// clipboard braucht einen sicheren Kontext; über http scheitert es.
-			melde('Kopieren nicht möglich');
+			melde(t.kopierenGescheitert);
 		}
 	}
 
@@ -51,21 +58,21 @@
 </script>
 
 <div class="kopierleiste">
-	<button onclick={() => kopieren('ohne')} title="Nur den Antworttext kopieren">
+	<button onclick={() => kopieren('ohne')} title={t.textKopieren}>
 		<svg viewBox="0 0 20 20" aria-hidden="true">
 			<rect x="6.5" y="2.5" width="11" height="13" />
 			<path d="M13.5 17.5h-11v-13" />
 		</svg>
-		Text kopieren
+		{t.textKopieren}
 	</button>
 
-	<button onclick={() => kopieren('mit')} title="Antworttext mit den Quellenlinks kopieren">
+	<button onclick={() => kopieren('mit')} title={t.mitQuellenKopieren}>
 		<svg viewBox="0 0 20 20" aria-hidden="true">
 			<rect x="6.5" y="2.5" width="11" height="13" />
 			<path d="M13.5 17.5h-11v-13" />
 			<path d="M9 9.5h6M9 12.5h4" />
 		</svg>
-		Mit Quellen kopieren
+		{t.mitQuellenKopieren}
 	</button>
 
 	<span class="meldung" aria-live="polite">{gemeldet ?? ''}</span>

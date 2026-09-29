@@ -1,12 +1,22 @@
 <script lang="ts">
+	import { TEXTE, type Sprache } from './sprache';
 	import type { Analyse, Quelle } from './types';
 
 	let {
 		frage,
 		antwort,
 		quellen,
-		analyse
-	}: { frage: string; antwort: string; quellen: Quelle[]; analyse: Analyse | null } = $props();
+		analyse,
+		sprache = 'de'
+	}: {
+		frage: string;
+		antwort: string;
+		quellen: Quelle[];
+		analyse: Analyse | null;
+		sprache?: Sprache;
+	} = $props();
+
+	const t = $derived(TEXTE[sprache]);
 
 	let stand = $state<'offen' | 'sendet' | 'gesendet' | 'fehler'>('offen');
 	let bewertung = $state<boolean | null>(null);
@@ -65,12 +75,12 @@
 
 <div class="rueckmeldung">
 	{#if stand === 'gesendet'}
-		<p class="dank" role="status">Danke – das hilft uns weiter.</p>
+		<p class="dank" role="status">{t.dank}</p>
 	{:else if stand === 'fehler'}
-		<p class="dank" role="status">Die Rückmeldung konnte nicht gespeichert werden.</p>
+		<p class="dank" role="status">{t.rueckmeldungFehler}</p>
 	{:else}
 		<div class="zeile">
-			<span class="frageText">War diese Antwort hilfreich?</span>
+			<span class="frageText">{t.hilfreichFrage}</span>
 			<button
 				class:gewaehlt={bewertung === true}
 				disabled={stand === 'sendet'}
@@ -80,7 +90,7 @@
 					<path d="M6 17.5V8.5l4-6c1.2 0 2 .9 2 2v3.5h4.2c.9 0 1.6.9 1.4 1.8l-1.3 6c-.15.7-.8 1.2-1.5 1.2H6z" />
 					<path d="M6 8.5H2.5v9H6" />
 				</svg>
-				Ja
+				{t.ja}
 			</button>
 			<button
 				class:gewaehlt={bewertung === false}
@@ -91,23 +101,22 @@
 					<path d="M14 2.5v9l-4 6c-1.2 0-2-.9-2-2v-3.5H3.8c-.9 0-1.6-.9-1.4-1.8l1.3-6C3.85 3.5 4.5 3 5.2 3H14z" />
 					<path d="M14 11.5h3.5v-9H14" />
 				</svg>
-				Nein
+				{t.nein}
 			</button>
 		</div>
 
 		{#if zeigeFeld}
 			<div class="nachfrage">
-				<label for="anmerkung">Was hat gefehlt oder gestimmt nicht? (freiwillig)</label>
+				<label for="anmerkung">{t.wasFehlte}</label>
 				<textarea id="anmerkung" bind:value={anmerkung} rows="3"></textarea>
 				<button class="absenden" onclick={() => senden(false, true)} disabled={stand === 'sendet'}>
-					{stand === 'sendet' ? 'Sendet …' : 'Absenden'}
+					{stand === 'sendet' ? t.sendet : t.absenden}
 				</button>
 			</div>
 		{/if}
 
 		<p class="hinweis">
-			Frage und Antwort werden dabei auf dem Server gespeichert, damit wir den Prototyp
-			verbessern können.
+			{t.rueckmeldungHinweis}
 		</p>
 	{/if}
 </div>

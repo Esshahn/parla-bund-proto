@@ -1,8 +1,14 @@
 <script lang="ts">
+	import { TEXTE, type Sprache } from './sprache';
 	import type { Quelle } from './types';
 
-	let { quellen, hervorgehoben }: { quellen: Quelle[]; hervorgehoben: number | null } =
-		$props();
+	let {
+		quellen,
+		hervorgehoben,
+		sprache = 'de'
+	}: { quellen: Quelle[]; hervorgehoben: number | null; sprache?: Sprache } = $props();
+
+	const t = $derived(TEXTE[sprache]);
 
 	let offen = $state<Set<number>>(new Set());
 
@@ -53,7 +59,7 @@
 			{#if gruppe.kopf.pdf_url}
 				<p class="original">
 					<a href={gruppe.kopf.pdf_url} target="_blank" rel="noopener">
-						Dokument beim Bundestag ↗
+						{t.dokumentBeimBundestag}
 					</a>
 				</p>
 			{/if}
@@ -71,7 +77,7 @@
 								<p class="redner">{sprecher(stelle)}</p>
 							{/if}
 							<button class="link" onclick={() => umschalten(stelle.nummer)}>
-								{offen.has(stelle.nummer) ? 'Auszug ausblenden' : 'Auszug im Original'}
+								{offen.has(stelle.nummer) ? t.auszugAusblenden : t.auszugZeigen}
 							</button>
 							{#if offen.has(stelle.nummer)}
 								<blockquote class="auszug">{stelle.auszug}</blockquote>

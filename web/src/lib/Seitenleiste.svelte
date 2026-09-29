@@ -4,6 +4,8 @@
 	// waere auf der hellen Leiste unsichtbar.
 	import citylab from './assets/citylab-berlin.svg?raw';
 	import Informationen from './Informationen.svelte';
+	import Sprachwahl from './Sprachwahl.svelte';
+	import { TEXTE, type Sprache } from './sprache';
 	import type { VerlaufEintrag } from './verlauf';
 
 	let infoOffen = $state(false);
@@ -12,6 +14,7 @@
 		eintraege,
 		aktiveId,
 		offen = $bindable(),
+		sprache = $bindable(),
 		onNeueFrage,
 		onWaehlen,
 		onLeeren
@@ -19,10 +22,13 @@
 		eintraege: VerlaufEintrag[];
 		aktiveId: string | null;
 		offen: boolean;
+		sprache: Sprache;
 		onNeueFrage: () => void;
 		onWaehlen: (eintrag: VerlaufEintrag) => void;
 		onLeeren: () => void;
 	} = $props();
+
+	const t = $derived(TEXTE[sprache]);
 
 	let verlaufAufgeklappt = $state(true);
 	let loeschenBestaetigen = $state(false);
@@ -43,7 +49,7 @@
 			<span class="marke__name">Parla&nbsp;Bund</span>
 			<span class="marke__status">Prototyp</span>
 		</p>
-		<button class="schliessen" onclick={() => (offen = false)} aria-label="Menü schließen">
+		<button class="schliessen" onclick={() => (offen = false)} aria-label={t.menueSchliessen}>
 			×
 		</button>
 	</div>
@@ -55,7 +61,7 @@
 			offen = false;
 		}}
 	>
-		<span>Neue Frage</span>
+		<span>{t.neueFrage}</span>
 		<span class="neu__zeichen" aria-hidden="true">+</span>
 	</button>
 
@@ -65,16 +71,16 @@
 			onclick={() => (verlaufAufgeklappt = !verlaufAufgeklappt)}
 			aria-expanded={verlaufAufgeklappt}
 		>
-			Vorherige Fragen
+			{t.vorherigeFragen}
 			<span class="pfeil" class:pfeil--zu={!verlaufAufgeklappt} aria-hidden="true">⌄</span>
 		</button>
 
 		{#if verlaufAufgeklappt}
 			{#if eintraege.length === 0}
-				<p class="leer">Noch keine Fragen gestellt.</p>
+				<p class="leer">{t.keineFragen}</p>
 			{:else}
 				<button class="loeschen" onclick={leeren} onblur={() => (loeschenBestaetigen = false)}>
-					{loeschenBestaetigen ? 'Wirklich löschen?' : 'Fragenverlauf löschen'}
+					{loeschenBestaetigen ? t.verlaufLeerenBestaetigen : t.verlaufLeeren}
 				</button>
 
 				<ul class="liste">
@@ -98,12 +104,12 @@
 		{/if}
 	</div>
 
-	<div class="fuss">
-		<button class="info" onclick={() => (infoOffen = true)}>Informationen</button>
+	<div class="leistenfuss">
+		<Sprachwahl bind:sprache />
 
-		<p class="hinweis">Der Verlauf liegt nur in diesem Browser – nicht auf dem Server.</p>
+		<button class="info" onclick={() => (infoOffen = true)}>{t.informationen}</button>
 
-		<p class="urheber">Entwickelt vom</p>
+		<p class="urheber">{t.entwickeltVom}</p>
 		<a
 			class="citylab"
 			href="https://citylab-berlin.org"
@@ -117,7 +123,7 @@
 	</div>
 </aside>
 
-<Informationen bind:offen={infoOffen} />
+<Informationen bind:offen={infoOffen} {sprache} />
 
 {#if offen}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -136,7 +142,9 @@
 		padding: 1.5rem 1rem 1rem;
 		border-right: 1px solid var(--rand);
 		background: var(--flaeche);
-		overflow-y: auto;
+		/* Nur die Verlaufsliste scrollt - der Fuss mit Sprachwahl, Infolink
+		   und Logo bleibt immer sichtbar. */
+		overflow: hidden;
 	}
 
 	.kopf {
@@ -211,12 +219,18 @@
 	}
 
 	.verlauf {
+		display: flex;
+		flex-direction: column;
 		flex: 1;
 		margin-top: 1.6rem;
+		/* min-height: 0 ist noetig, damit ein Flex-Element ueberhaupt kleiner
+		   werden darf als sein Inhalt - sonst waechst es und der Inhalt malt
+		   ueber den Fuss hinweg, statt zu scrollen. */
 		min-height: 0;
 	}
 
 	.verlauf__titel {
+		flex: none;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -244,8 +258,7 @@
 		transform: rotate(-90deg);
 	}
 
-	.leer,
-	.hinweis {
+	.leer {
 		font-size: 0.78rem;
 		line-height: 1.5;
 		color: var(--text-leise);
@@ -256,6 +269,10 @@
 	}
 
 	.loeschen {
+		flex: none;
+		/* Im Spalten-Flex streckt sich der Knopf sonst auf volle Breite und
+		   zentriert seinen Text. */
+		align-self: flex-start;
 		margin: 0.7rem 0 0.3rem;
 		padding: 0;
 		border: none;
@@ -269,6 +286,12 @@
 	}
 
 	.liste {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		/* Platz fuer den Scrollbalken freihalten, damit die Eintraege nicht
+		   springen, wenn er erscheint (Windows, Linux). */
+		scrollbar-gutter: stable;
 		margin: 0.4rem 0 0;
 		padding: 0;
 		list-style: none;
@@ -310,7 +333,8 @@
 		font-weight: 600;
 	}
 
-	.fuss {
+	.leistenfuss {
+		flex: none;
 		margin-top: 1.4rem;
 		padding-top: 0.9rem;
 		border-top: 1px solid var(--rand);
@@ -319,7 +343,9 @@
 	.info {
 		display: block;
 		padding: 0;
-		margin-bottom: 0.7rem;
+		/* Den Abstand hielt vorher der Verlaufshinweis, der jetzt im
+		   Informationsfenster steht. */
+		margin-bottom: 1.3rem;
 		border: none;
 		background: none;
 		color: var(--akzent);
@@ -330,9 +356,6 @@
 		cursor: pointer;
 	}
 
-	.hinweis {
-		margin: 0 0 1.1rem;
-	}
 
 	.urheber {
 		margin: 0 0 0.4rem;

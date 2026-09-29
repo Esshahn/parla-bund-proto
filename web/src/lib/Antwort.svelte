@@ -40,7 +40,7 @@
 <!-- Ohne Zeilenumbrueche zwischen den Bloecken: die Einrueckung im Template
      waere echter Text und wuerde mit white-space: pre-wrap als Luecke vor dem
      Satzzeichen sichtbar. -->
-<p class="antwort">{#each teile as teil}{#if teil.art === 'text'}{teil.wert}{:else if bekannt.has(teil.nummer)}<button class="beleg" onclick={() => onBelegKlick(teil.nummer)} aria-label="Beleg {teil.nummer}, zur Quelle springen">{teil.nummer}</button>{:else}<span class="beleg beleg--unbekannt" title="Diese Quelle gibt es nicht" aria-label="Beleg {teil.nummer} – diese Quelle gibt es nicht">{teil.nummer}</span>{/if}{/each}</p>
+<p class="antwort">{#each teile as teil}{#if teil.art === 'text'}{teil.wert}{:else if bekannt.has(teil.nummer)}<button class="beleg" onclick={() => onBelegKlick(teil.nummer)} aria-label="Beleg {teil.nummer}, zur Quelle springen"><span class="klammer">[</span>{teil.nummer}<span class="klammer">]</span></button>{:else}<span class="beleg beleg--unbekannt" title="Diese Quelle gibt es nicht" aria-label="Beleg {teil.nummer} – diese Quelle gibt es nicht"><span class="klammer">[</span>{teil.nummer}<span class="klammer">]</span></span>{/if}{/each}</p>
 
 <style>
 	.antwort {
@@ -48,6 +48,17 @@
 		font-size: 1.05rem;
 		line-height: 1.75;
 		white-space: pre-wrap;
+	}
+
+	/* Die Klammern sind nur fuer das Markieren und Kopieren da: Ohne sie
+	   ergibt eine Auswahl ueber mehrere Belege "1621" statt "[16][21]".
+	   Vorgelesen wird stattdessen das aria-label. */
+	.klammer {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
 	}
 
 	/* Eckig wie alles im DIP, in der Linkfarbe - der Beleg ist ein Verweis. */

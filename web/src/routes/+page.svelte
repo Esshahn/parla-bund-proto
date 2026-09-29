@@ -6,15 +6,9 @@
 	import Rueckmeldung from '$lib/Rueckmeldung.svelte';
 	import Seitenleiste from '$lib/Seitenleiste.svelte';
 	import * as verlauf from '$lib/verlauf';
+	import { TEXTE, HTML_LANG, gespeicherteSprache, spracheMerken, type Sprache } from '$lib/sprache';
 	import type { VerlaufEintrag } from '$lib/verlauf';
 	import type { AskEvent, Analyse, Quelle } from '$lib/types';
-
-	const BEISPIELE = [
-		'Bekomme ich Geld, wenn ich mir ein E-Auto kaufe?',
-		'Was ist die Frühstartrente und wer bekommt sie?',
-		'Wie positionieren sich die Fraktionen zur Wehrpflicht?',
-		'Was wurde zuletzt zum Thema Mietpreise beschlossen?'
-	];
 
 	let frage = $state('');
 	let laeuft = $state(false);
@@ -42,6 +36,19 @@
 		new Set(sichtbareQuellen.map((q) => `${q.dokumentart}-${q.dokumentnummer}`)).size
 	);
 
+	let sprache = $state<Sprache>('de');
+	const t = $derived(TEXTE[sprache]);
+
+	// Erst nach dem Laden speichern. Sonst schreibt dieser Effekt beim
+	// Mounten die Vorgabe 'de' in den Speicher, bevor onMount den gemerkten
+	// Wert setzen kann - die Wahl waere nach jedem Neuladen weg.
+	let spracheGeladen = $state(false);
+
+	$effect(() => {
+		document.documentElement.lang = HTML_LANG[sprache];
+		if (spracheGeladen) spracheMerken(sprache);
+	});
+
 	let eintraege = $state<VerlaufEintrag[]>([]);
 	let aktiveId = $state<string | null>(null);
 	let leisteOffen = $state(false);
@@ -49,6 +56,8 @@
 	// localStorage gibt es beim Serverrendern nicht.
 	onMount(() => {
 		eintraege = verlauf.laden();
+		sprache = gespeicherteSprache();
+		spracheGeladen = true;
 	});
 
 	function neueFrage() {
@@ -89,13 +98,13 @@
 	// waere als aria-live zu geschwaetzig - er kaeme Stueck fuer Stueck an.
 	const meldung = $derived(
 		fehler
-			? `Fehler: ${fehler}`
+			? fehler
 			: laeuft
 				? quellen.length
-					? `${quellen.length} Belegstellen gefunden, Antwort wird formuliert.`
-					: 'Drucksachen und Plenarprotokolle werden durchsucht.'
+					? t.statusBelege(quellen.length)
+					: t.statusSucht
 				: antwort
-					? `Antwort fertig, ${zitierte.size} Belege aus ${anzahlDokumente} Dokumenten.`
+					? t.statusFertig(zitierte.size, anzahlDokumente)
 					: ''
 	);
 
@@ -122,7 +131,7 @@
 			const antwortStrom = await fetch('/api/ask', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ frage: text }),
+				body: JSON.stringify({ frage: text, sprache }),
 				signal: abbruch.signal
 			});
 
@@ -192,13 +201,14 @@
 	}
 </script>
 
-<a class="sprung" href="#inhalt">Zum Inhalt springen</a>
+<a class="sprung" href="#inhalt">{t.zumInhalt}</a>
 
 <div class="rahmen">
 	<Seitenleiste
 		{eintraege}
 		{aktiveId}
 		bind:offen={leisteOffen}
+		bind:sprache
 		onNeueFrage={neueFrage}
 		onWaehlen={ausVerlauf}
 		onLeeren={verlaufLeeren}
@@ -206,15 +216,12 @@
 
 	<main id="inhalt">
 		<header class="kopf">
-			<button class="menue" onclick={() => (leisteOffen = true)} aria-label="Menü öffnen">
+			<button class="menue" onclick={() => (leisteOffen = true)} aria-label={t.menueOeffnen}>
 				<span aria-hidden="true">☰</span>
 			</button>
 			<div>
-				<h1>Fragen an den Deutschen Bundestag</h1>
-				<p class="untertitel">
-					In Alltagssprache gefragt, mit Beleg aus Drucksachen und Plenarprotokollen
-					beantwortet.
-				</p>
+				<h1>{t.titel}</h1>
+<p class="untertitel">{t.untertitel}</p>
 			</div>
 		</header>
 
@@ -228,20 +235,20 @@
 			<input
 				type="text"
 				bind:value={frage}
-				placeholder="Was möchten Sie wissen?"
-				aria-label="Ihre Frage an den Bundestag"
+				placeholder={t.platzhalter}
+				aria-label={t.sucheLabel}
 				disabled={laeuft}
 			/>
 			<button type="submit" disabled={laeuft || !frage.trim()}>
-				{laeuft ? 'Sucht …' : 'Fragen'}
+				{laeuft ? t.sucht : t.fragenKnopf}
 			</button>
 		</form>
 
 		{#if !gestellteFrage && !laeuft}
 			<section class="beispiele">
-				<p class="beispiele__titel">Zum Ausprobieren:</p>
+				<p class="beispiele__titel">{t.beispieleTitel}</p>
 				<ul>
-					{#each BEISPIELE as beispiel}
+					{#each t.beispiele as beispiel (beispiel)}
 						<li>
 							<button onclick={() => fragen(beispiel)}>{beispiel}</button>
 						</li>
@@ -258,43 +265,41 @@
 			<section class="ergebnis">
 				{#if analyse?.suchbegriffe && analyse.suchbegriffe !== gestellteFrage}
 					<p class="gesucht">
-						Gesucht nach: <span>{analyse.suchbegriffe}</span>
+						{t.gesuchtNach} <span>{analyse.suchbegriffe}</span>
 					</p>
 				{/if}
 
 				<p class="nur-fuer-screenreader" role="status" aria-live="polite">{meldung}</p>
+
+				{#if t.leichteSpracheHinweis || t.quellenDeutschHinweis}
+					<p class="sprachhinweis">{t.leichteSpracheHinweis ?? t.quellenDeutschHinweis}</p>
+				{/if}
 
 				{#if antwort}
 					<div class="antwortfeld">
 						<Antwort text={antwort} {quellen} onBelegKlick={zurQuelle} />
 					</div>
 					{#if !laeuft}
-						<Kopieren text={antwort} {quellen} />
-						<Rueckmeldung frage={gestellteFrage} {antwort} {quellen} {analyse} />
+						<Kopieren text={antwort} {quellen} {sprache} />
+						<Rueckmeldung frage={gestellteFrage} {antwort} {quellen} {analyse} {sprache} />
 					{/if}
 				{:else if laeuft}
 					<p class="warten">
 						<span class="spinner" aria-hidden="true"></span>
-						{quellen.length
-							? `${quellen.length} Belegstellen gefunden – formuliere die Antwort …`
-							: 'Durchsuche Drucksachen und Plenarprotokolle …'}
+						{quellen.length ? t.belegeGefunden(quellen.length) : t.durchsucht}
 					</p>
 				{/if}
 
 				{#if sichtbareQuellen.length}
 					<h2 class="quellen__titel">
-						Quellen <span
-							>({anzahlDokumente}
-							{anzahlDokumente === 1 ? 'Dokument' : 'Dokumente'}, {sichtbareQuellen.length}
-							{sichtbareQuellen.length === 1 ? 'Stelle' : 'Stellen'})</span
-						>
+						{t.quellen}
+						<span>{t.quellenZahl(anzahlDokumente, sichtbareQuellen.length)}</span>
 					</h2>
-					<Quellenliste quellen={sichtbareQuellen} {hervorgehoben} />
+					<Quellenliste quellen={sichtbareQuellen} {hervorgehoben} {sprache} />
 
 					{#if !laeuft && quellen.length > sichtbareQuellen.length}
 						<button class="mehr" onclick={() => (alleQuellen = true)}>
-							Auch die {quellen.length - sichtbareQuellen.length} Stellen zeigen, die
-							durchsucht, aber nicht belegt wurden
+							{t.mehrStellen(quellen.length - sichtbareQuellen.length)}
 						</button>
 					{/if}
 				{/if}
@@ -302,17 +307,7 @@
 		{/if}
 
 		<footer class="fuss">
-			<p>
-				Prototyp. Durchsucht werden Drucksachen und Plenarprotokolle der laufenden
-				Wahlperiode&nbsp;21 des Deutschen Bundestages, bezogen über die
-				<a href="https://dip.bundestag.de/%C3%BCber-dip/hilfe/api" target="_blank" rel="noopener"
-					>DIP-API</a
-				>.
-			</p>
-			<p>
-				Die Antworten erzeugt ein Sprachmodell und kann Fehler enthalten. Maßgeblich ist
-				allein das verlinkte Originaldokument – bitte prüfen Sie dort nach.
-			</p>
+			<p>{t.fussWarnung}</p>
 		</footer>
 	</main>
 </div>
@@ -506,6 +501,18 @@
 
 	/* Die Antwort ist das Ergebnis und soll sich vom Beiwerk absetzen -
 	   ohne Kasten, nur durch Flaeche und eine Kante in der Primaerfarbe. */
+	/* Weist auf die Grenzen der gewaehlten Sprachfassung hin: maschinell
+	   erzeugte Leichte Sprache, bzw. deutsche Quellen bei englischer Antwort. */
+	.sprachhinweis {
+		margin: 0 0 1rem;
+		padding: 0.55rem 0.75rem;
+		border-left: 3px solid var(--rand-kraeftig);
+		background: var(--flaeche);
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--text-leise);
+	}
+
 	.antwortfeld {
 		padding: 1.1rem 1.3rem;
 		border-left: 3px solid var(--dunkel);
@@ -603,9 +610,6 @@
 		margin: 0 0 0.5rem;
 	}
 
-	.fuss a {
-		color: inherit;
-	}
 
 	@media (max-width: 900px) {
 		.menue {
