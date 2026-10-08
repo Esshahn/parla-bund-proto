@@ -2,6 +2,29 @@
 	import { TEXTE, type Sprache } from './sprache';
 	import type { Quelle } from './types';
 
+	// Dieselben Steuerzeichen wie in src/lib/server/retrieve.ts. Sie koennen
+	// im Korpus nicht vorkommen, deshalb genuegt ein simples Zerlegen - kein
+	// {@html} noetig und damit kein Einschleusungsrisiko.
+	const MARK_AUF = '\u0001';
+	const MARK_ZU = '\u0002';
+
+	type Stueck = { treffer: boolean; text: string };
+
+	function zerlege(auszug: string): Stueck[] {
+		const stuecke: Stueck[] = [];
+		for (const teil of auszug.split(MARK_AUF)) {
+			const [markiert, ...rest] = teil.split(MARK_ZU);
+			if (rest.length === 0) {
+				if (markiert) stuecke.push({ treffer: false, text: markiert });
+			} else {
+				if (markiert) stuecke.push({ treffer: true, text: markiert });
+				const schwanz = rest.join(MARK_ZU);
+				if (schwanz) stuecke.push({ treffer: false, text: schwanz });
+			}
+		}
+		return stuecke;
+	}
+
 	let {
 		quellen,
 		hervorgehoben,
@@ -80,7 +103,11 @@
 								{offen.has(stelle.nummer) ? t.auszugAusblenden : t.auszugZeigen}
 							</button>
 							{#if offen.has(stelle.nummer)}
-								<blockquote class="auszug">{stelle.auszug}</blockquote>
+								<blockquote class="auszug"
+									>{#each zerlege(stelle.auszug) as stueck}{#if stueck.treffer}<mark
+												>{stueck.text}</mark
+											>{:else}{stueck.text}{/if}{/each}</blockquote
+								>
 							{/if}
 						</div>
 					</li>
@@ -186,6 +213,19 @@
 		text-decoration: underline;
 		text-underline-offset: 2px;
 		cursor: pointer;
+	}
+
+	/* Markiert wird ein ganzer Satz, nicht einzelne Woerter. Fett waere dabei
+	   zu laut; stattdessen ein kraeftigeres Gelb, damit der Block auch ohne
+	   Farbwahrnehmung als Flaeche auffaellt. Der Text wird zugleich dunkler
+	   gesetzt - auf dem Gelb ergibt das 9,9:1 statt 5,9:1. */
+	mark {
+		background: #ffe45c;
+		color: var(--text);
+		border-radius: 2px;
+		padding: 0.05em 0.1em;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
 	}
 
 	.auszug {

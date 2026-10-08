@@ -94,7 +94,7 @@ type Texte = {
 
 export const TEXTE: Record<Sprache, Texte> = {
 	de: {
-		titel: 'Fragen an den Deutschen Bundestag',
+		titel: 'Befragen Sie den Deutschen Bundestag',
 		untertitel:
 			'In Alltagssprache gefragt, mit Beleg aus Drucksachen und Plenarprotokollen beantwortet.',
 		platzhalter: 'Was möchten Sie wissen?',
@@ -155,7 +155,7 @@ export const TEXTE: Record<Sprache, Texte> = {
 	},
 
 	en: {
-		titel: 'Questions for the German Bundestag',
+		titel: 'Ask the German Bundestag',
 		untertitel:
 			'Ask in plain language, get an answer backed by parliamentary papers and plenary minutes.',
 		platzhalter: 'What would you like to know?',
@@ -217,7 +217,7 @@ export const TEXTE: Record<Sprache, Texte> = {
 	},
 
 	ls: {
-		titel: 'Fragen an den Bundestag',
+		titel: 'Fragen Sie den Bundestag',
 		untertitel:
 			'Sie können hier eine Frage stellen. Die Antwort kommt aus Texten vom Bundestag.',
 		platzhalter: 'Was wollen Sie wissen?',

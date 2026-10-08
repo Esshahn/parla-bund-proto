@@ -21,6 +21,11 @@
 	let gestellteFrage = $state('');
 	let alleQuellen = $state(false);
 
+	// Vor der ersten Frage steht die Suche mittig, wie bei heutigen
+	// KI-Assistenten. Sobald eine Antwort da ist, wandert sie nach oben -
+	// sonst springt die Seite beim Antworten.
+	const startansicht = $derived(!gestellteFrage && !laeuft);
+
 	const teile = $derived(teileAntwort(antwort, laeuft));
 
 	// Zum Kontext gehoerten mehr Stellen, als die Antwort am Ende belegt.
@@ -38,6 +43,8 @@
 	const anzahlDokumente = $derived(
 		new Set(sichtbareQuellen.map((q) => `${q.dokumentart}-${q.dokumentnummer}`)).size
 	);
+
+	const BEISPIELE_SICHTBAR = 3;
 
 	let sprache = $state<Sprache>('de');
 	const t = $derived(TEXTE[sprache]);
@@ -217,16 +224,25 @@
 		onLeeren={verlaufLeeren}
 	/>
 
-	<main id="inhalt">
+	<main id="inhalt" class:main--start={startansicht}>
 		<header class="kopf">
 			<button class="menue" onclick={() => (leisteOffen = true)} aria-label={t.menueOeffnen}>
 				<span aria-hidden="true">☰</span>
 			</button>
-			<div>
-				<h1>{t.titel}</h1>
-<p class="untertitel">{t.untertitel}</p>
-			</div>
+			{#if !startansicht}
+				<div>
+					<h1>{t.titel}</h1>
+					<p class="untertitel">{t.untertitel}</p>
+				</div>
+			{/if}
 		</header>
+
+		{#if startansicht}
+			<div class="held">
+				<h1 class="held__titel">{t.titel}</h1>
+				<p class="held__unter">{t.untertitel}</p>
+			</div>
+		{/if}
 
 		<form
 			class="suche"
@@ -247,11 +263,11 @@
 			</button>
 		</form>
 
-		{#if !gestellteFrage && !laeuft}
+		{#if startansicht}
 			<section class="beispiele">
 				<p class="beispiele__titel">{t.beispieleTitel}</p>
 				<ul>
-					{#each t.beispiele as beispiel (beispiel)}
+					{#each t.beispiele.slice(0, BEISPIELE_SICHTBAR) as beispiel (beispiel)}
 						<li>
 							<button onclick={() => fragen(beispiel)}>{beispiel}</button>
 						</li>
@@ -373,6 +389,55 @@
 		max-width: var(--spalte);
 		margin: 0 auto;
 		padding: 2.5rem 16px 4rem;
+	}
+
+	/* Startzustand: Kopf, Suche und Beispiele stehen als Block in der
+	   Mitte - die Suche ist hier das Einzige auf der Seite. Sobald eine
+	   Frage gestellt ist, gilt wieder das normale Layout von oben. */
+	.main--start {
+		display: flex;
+		flex-direction: column;
+		/* 100dvh, damit die mobile Adressleiste die Mitte nicht verschiebt. */
+		min-height: 100dvh;
+		padding-top: 1rem;
+		padding-bottom: 1rem;
+	}
+
+	/* Im Startzustand traegt der Kopf nur noch den Menueknopf. */
+	.main--start .kopf {
+		padding-bottom: 0;
+		border-bottom: none;
+		margin-bottom: 0;
+	}
+
+	.held {
+		margin-bottom: 1.8rem;
+		text-align: center;
+	}
+
+	.held__titel {
+		margin: 0;
+		font-family: var(--serif);
+		font-size: 2.4rem;
+		font-weight: 400;
+		line-height: 1.2;
+	}
+
+	.held__unter {
+		margin: 0.7rem 0 0;
+		font-size: 1rem;
+		color: var(--text-leise);
+	}
+
+	/* Auto-Raender statt justify-content: so bleibt der Menueknopf oben
+	   stehen, waehrend die Gruppe darunter mittig sitzt. */
+	.main--start .held {
+		margin-top: auto;
+	}
+
+	.main--start .beispiele {
+		margin-top: 2.2rem;
+		margin-bottom: auto;
 	}
 
 	.kopf {
@@ -667,6 +732,10 @@
 
 		main {
 			padding-top: 1.5rem;
+		}
+
+		.held__titel {
+			font-size: 1.9rem;
 		}
 	}
 </style>

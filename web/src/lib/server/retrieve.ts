@@ -180,6 +180,90 @@ export async function withNeighbours(hits: Hit[], window = 1): Promise<Hit[]> {
 	return [...hits, ...nachbarn.values()];
 }
 
+/**
+ * Steuerzeichen als Markierung. Sie koennen im Korpus nicht vorkommen - die
+ * Normalisierung entfernt den gesamten Bereich \x00-\x08 (siehe
+ * ingest/parla_ingest/normalize.py). Damit braucht es kein Escaping und die
+ * Oberflaeche kann den Text ohne {@html} zerlegen.
+ */
+export const MARK_AUF = '\u0001';
+export const MARK_ZU = '\u0002';
+
+/**
+ * Sucht je Auszug den Satz, der die Frage am ehesten beantwortet.
+ *
+ * Nicht einzelne Woerter hervorzuheben, sondern den tragenden Satz: Auf
+ * "Wie viele Einhoerner leben in Berlin?" soll der Satz leuchten, der sagt,
+ * dass dort keine leben - nicht jedes einzelne Vorkommen von "Berlin".
+ *
+ * Postgres zerlegt den Auszug in Saetze und bewertet jeden gegen dieselbe
+ * Suchanfrage wie die Wortsuche, mit derselben deutschen Stammformbildung.
+ * Bei gleicher Bewertung gewinnt der kuerzere Satz - gesucht ist die knappe
+ * Aussage, nicht der laengste Treffer.
+ *
+ * Zwei Eigenheiten deutscher Verwaltungstexte sind beruecksichtigt:
+ *   - Nach dem Punkt muss ein Grossbuchstabe folgen, sonst zerfaellt der Text
+ *     an Abkuerzungen wie "Abs. 3", "Nr. 5" oder "z. B.".
+ *   - Fragmente unter 30 Zeichen koennen nicht gewinnen; sie sind fast immer
+ *     Reste einer missglueckten Trennung.
+ *
+ * Findet sich kein Satz mit Treffern - etwa weil die Stelle nur die
+ * Bedeutungssuche gefunden hat -, wird nichts hervorgehoben. Auch das ist
+ * eine ehrliche Auskunft.
+ */
+export async function besterSatz(
+	ids: number[],
+	terme: string[]
+): Promise<Map<string, string>> {
+	const ergebnis = new Map<string, string>();
+	if (ids.length === 0 || terme.length === 0) return ergebnis;
+
+	try {
+		const sql = db();
+		const rows = await sql<{ id: string; satz: string }[]>`
+			WITH saetze AS (
+				SELECT c.id, t.i, t.satz,
+				       ts_rank_cd(to_tsvector('german', t.satz),
+				                  parla_tsquery(${terme}::text[])) AS punkte
+				  FROM chunks c,
+				       LATERAL unnest(
+				         -- Der Backslash muss doppelt stehen: In einem Template-Literal
+				         -- wird ein einfaches \\s zu s, und die Trennung suchte dann
+				         -- ein "s" nach dem Punkt statt Leerraum.
+				         regexp_split_to_array(
+				           c.text, '(?<=[^0-9][.!?])\\s+(?=[A-ZÄÖÜ„"(])')
+				       ) WITH ORDINALITY AS t(satz, i)
+				 WHERE c.id = ANY(${ids}::bigint[])
+			)
+			SELECT DISTINCT ON (id) id, satz
+			  FROM saetze
+			 -- Ein Abschnitt beginnt in der Regel mitten im Satz, weil beim
+			 -- Chunking nach Zeichenzahl geschnitten wird. Dieses erste
+			 -- Fragment darf nicht gewinnen, sonst beginnt die Markierung
+			 -- mitten im Wort.
+			 WHERE length(satz) BETWEEN 30 AND 350 AND punkte > 0
+			   AND satz ~ '^[A-ZÄÖÜ„"(]'
+			 ORDER BY id, punkte DESC, length(satz) ASC`;
+		for (const r of rows) ergebnis.set(String(r.id), r.satz);
+	} catch (error) {
+		// Ohne Hervorhebung bleibt der Auszug lesbar - das darf nichts kosten.
+		console.warn('Satzauswahl nicht moeglich:', error);
+	}
+	return ergebnis;
+}
+
+/**
+ * Setzt die Markierung um den gefundenen Satz. Ueber indexOf statt durch
+ * Zusammensetzen in SQL, damit der Auszug zeichengenau erhalten bleibt.
+ */
+export function markiereSatz(auszug: string, satz: string): string {
+	const i = auszug.indexOf(satz);
+	if (i === -1) return auszug;
+	return (
+		auszug.slice(0, i) + MARK_AUF + satz + MARK_ZU + auszug.slice(i + satz.length)
+	);
+}
+
 /** Kurzform fuer die Quellenangabe in der Antwort. */
 export function quelle(hit: Hit): string {
 	const attribut = hit.fraktion ?? hit.rolle;

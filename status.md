@@ -204,6 +204,42 @@ ich hatte einzelne Chunks als „richtig" festgelegt, darunter einen, der vom
 „Digitalcheck" handelt. Auf Dokumentebene gemessen liegt die Quote bei 83 bis
 100 %.
 
+## Der tragende Satz in den Auszügen
+
+In den aufgeklappten Quellenauszügen ist **der Satz** gelb markiert, der die
+Frage beantwortet — nicht einzelne Suchwörter. Auf „Wie viele Einhörner leben
+in Berlin?" soll der Satz leuchten, der sagt, dass dort keine leben.
+
+Postgres zerlegt den Auszug in Sätze und bewertet jeden gegen dieselbe
+Suchanfrage wie die Wortsuche, mit derselben deutschen Stammformbildung.
+
+Die Satztrennung an deutschem Verwaltungstext brauchte vier Bedingungen, jede
+davon aus einem beobachteten Fehler:
+
+| Bedingung | sonst passiert |
+|---|---|
+| Großbuchstabe nach dem Punkt | zerfällt an „Abs. 3", „Nr. 5", „z. B." |
+| keine Ziffer vor dem Punkt | „vom 17. Juli 2025" bricht nach der 17 ab |
+| Satz beginnt groß | Abschnitte beginnen mitten im Satz, Markierung startet im Wort |
+| 30 bis 350 Zeichen | darunter Trennreste, darüber leuchtet der halbe Auszug |
+
+Bei gleicher Bewertung gewinnt der **kürzere** Satz — gesucht ist die knappe
+Aussage. Findet sich kein treffender Satz, wird nichts markiert; das ist bei
+Stellen der Fall, die nur die Bedeutungssuche gefunden hat, und damit eine
+ehrliche Auskunft.
+
+**Ein Fehler, der sich zweimal getarnt hat:** Die Trennung lief über einen
+regulären Ausdruck in einem Template-Literal. Dort wird `\s` zu `s` — gesucht
+wurde also ein „s" nach dem Punkt statt Leerraum. Der ganze Auszug war ein
+einziger Pseudo-Satz. Zunächst sah das nach „zu großzügiger Markierung" aus,
+nach Einführung der Obergrenze dann nach „gar keine Markierung". Erst der
+direkte Vergleich von SQL und Anwendung hat es gezeigt.
+
+Markiert wird nur der angezeigte Auszug, nicht der Kontext fürs Modell. Als
+Markierung dienen die Steuerzeichen `\u0001` und `\u0002`; sie können im
+Korpus nicht vorkommen, weil die Normalisierung den Bereich entfernt. Die
+Oberfläche zerlegt daran und setzt `<mark>` — ohne `{@html}`.
+
 ## Kurzantwort vor der ausführlichen
 
 Jede Antwort beginnt jetzt mit einem Satz, der die Frage direkt beantwortet;

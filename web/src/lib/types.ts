@@ -5,6 +5,7 @@ export type Analyse = {
 
 export type Quelle = {
 	nummer: number;
+	chunkId: number;
 	quelle: string;
 	titel: string;
 	datum: string;

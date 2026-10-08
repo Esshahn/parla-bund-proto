@@ -7,7 +7,15 @@ import ANTWORT_LS from '../../../prompts/answer.ls.txt?raw';
 import type { Sprache } from '../sprache';
 import { DENKBUDGET_ANALYSE, DENKBUDGET_ANTWORT, TOP_K } from './config';
 import { embedQuery, generate, generateStream } from './gemini';
-import { quelle, search, withNeighbours, type Hit } from './retrieve';
+import {
+	besterSatz,
+	markiereSatz,
+	quelle,
+	queryTerms,
+	search,
+	withNeighbours,
+	type Hit
+} from './retrieve';
 
 /**
  * Die RAG-Pipeline: Frage aufbereiten, suchen, belegte Antwort formulieren.
@@ -69,6 +77,9 @@ export type Analyse = {
 
 export type Quelle = {
 	nummer: number;
+	/** Nur fuer die Hervorhebung; erreicht die Oberflaeche, wird dort aber
+	 *  nicht angezeigt. */
+	chunkId: number;
 	quelle: string;
 	titel: string;
 	datum: string;
@@ -127,6 +138,7 @@ export function buildContext(hits: Hit[]): { kontext: string; quellen: Quelle[] 
 		length += block.length;
 		quellen.push({
 			nummer,
+			chunkId: hit.chunk_id,
 			quelle: quelle(hit),
 			titel: hit.titel,
 			datum: hit.datum,
@@ -188,6 +200,18 @@ export async function* ask(
 	}
 
 	const { kontext, quellen } = buildContext(await withNeighbours(hits, NEIGHBOUR_WINDOW));
+
+	// Nur die angezeigten Auszuege bekommen eine Markierung. Der Kontext fuer
+	// das Modell bleibt unmarkiert - Steuerzeichen im Prompt waeren Rauschen.
+	const saetze = await besterSatz(
+		quellen.map((q) => q.chunkId),
+		queryTerms(analyse.suchbegriffe)
+	);
+	for (const q of quellen) {
+		const satz = saetze.get(String(q.chunkId));
+		if (satz) q.auszug = markiereSatz(q.auszug, satz);
+	}
+
 	yield { typ: 'quellen', quellen };
 
 	const prompt = fuelle(ANTWORT_PROMPT[sprache], { kontext, frage });
